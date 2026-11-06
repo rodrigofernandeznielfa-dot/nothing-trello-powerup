@@ -99,6 +99,16 @@ function renderReferences(card){
   addReferenceHover(a,ref);wrap.append(a);
  }
 }
+function explicitNextDecision(desc){
+ const lines=String(desc||"").replace(/\r/g,"").split("\n");
+ for(let i=0;i<lines.length;i++){
+  if(lines[i].trim()==="**Siguiente decisión**" || lines[i].trim()==="**Siguiente paso**"){
+   const next=lines.slice(i+1).find(x=>x.trim().length>0);
+   if(next && !next.startsWith("**") && !next.startsWith("NB_"))return next.trim();
+  }
+ }
+ return null;
+}
 function render(card,estimate,dependencies){
  const s=extract(card,estimate||{});
  const finished=card.idList===DONE,progress=s.total?Math.round(s.completed*100/s.total):null;
@@ -141,7 +151,7 @@ function render(card,estimate,dependencies){
  });if(s.items.length>12){const li=document.createElement("li");li.className="small";li.textContent="Y "+(s.items.length-12)+" criterios más en la checklist de Trello";list.append(li)}}
  else{const li=document.createElement("li");li.className="muted";li.textContent=s.total?"Hay "+s.total+" criterios; el detalle no está disponible en esta vista.":"Esta tarjeta todavía no tiene checklist.";list.append(li)}
  const next=s.items.find(item=>!item.done);
- setText("next",finished?"Trabajo cerrado. Consulta la descripción y las evidencias de la tarjeta.":blocked?"Continuaremos cuando se complete la dependencia.":next?next.name:"Revisar la descripción de la tarjeta para elegir el siguiente paso.");
+ setText("next",finished?"Trabajo cerrado. Consulta la descripción y las evidencias de la tarjeta.":blocked?"Continuaremos cuando se complete la dependencia.":explicitNextDecision(card.desc)||(next?next.name:"Revisar la descripción de la tarjeta para elegir el siguiente paso."));
  const warnings=[];
  if(!finished&&s.total&&s.completed===s.total)warnings.push("Checklist completa, pero la tarjeta todavía no está cerrada.");
  if(!finished&&s.remaining===null)warnings.push("Tiempo restante no calculable: faltan estimaciones o detalle de los criterios.");
