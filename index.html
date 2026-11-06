@@ -25,7 +25,7 @@
   }
   window.TrelloPowerUp.initialize({
     "card-buttons":function(t){return [{text:"NOTHING · Estimar criterios",condition:"always",callback:function(ctx){return ctx.popup({title:"Estimaciones de trabajo",url:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/estimate.html",height:420})}}]},
-    "card-badges":function(t){return [{text:"NB · ACTIVO",color:"green"}].concat([0,1].map(function(i){return {dynamic:async function(){try{var a=await getBadges(t);return Object.assign({refresh:60},a[i]||{text:""})}catch(e){console.error("NOTHING badge",e);return {text:"",refresh:60}}}}}))},
+    "card-badges":async function(t){try{return await getBadges(t)}catch(e){console.error("NOTHING badge",e);return [{text:"NB · ERROR DE LECTURA",color:"red"}]}},
     "card-detail-badges":async function(t){try{var a=await getBadges(t);return a.map(function(x,i){return Object.assign({title:i?"Horas restantes":"Progreso verificado"},x)})}catch(e){console.error("NOTHING detail",e);return []}}
   });
 })();
