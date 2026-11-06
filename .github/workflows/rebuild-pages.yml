@@ -68,3 +68,17 @@ jobs:
       - name: Deploy Pages artifact
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Verify deployed files are publicly accessible
+        shell: bash
+        env:
+          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          base="${PAGES_URL%/}"
+          for file in connector.html connector-v13.html connector-v17.html progress-panel.html reference-catalog.js; do
+            echo "Checking ${base}/${file}"
+            curl --fail --silent --show-error --location --retry 8 --retry-all-errors --retry-delay 8 --max-time 20 \
+              --output /dev/null "${base}/${file}"
+          done
+          echo "All required Power-Up URLs are available."
