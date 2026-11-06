@@ -18,10 +18,8 @@ export function summarize(checklists = [], estimates = {}) {
   const unestimated = pending.filter(x=>!validHours(estimates[x.id])).length;
   const remainingHours = unestimated===0 && total>0
     ? Math.round(pending.reduce((sum,x)=>sum+estimates[x.id],0)*10)/10 : null;
-  return {
-    complete, total, percentage: total ? Math.round(100*complete/total) : null,
-    remainingHours, unestimated
-  };
+  return {complete, total, percentage: total ? Math.round(100*complete/total) : null,
+    remainingHours, unestimated};
 }
 export function progressBar(p) {
   if (p === null) return "";

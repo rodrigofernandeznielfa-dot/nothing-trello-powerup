@@ -51,7 +51,6 @@ button.addEventListener("click",async ()=>{
   button.disabled=true;error.textContent="";
   try {
     const value=extract();
-    // Refresh from Trello to avoid overwriting a newer set of estimates.
     const latest=await t.get("card","shared",ESTIMATE_KEY,{});
     if(JSON.stringify(latest||{})!==JSON.stringify(initial))throw Error("Las estimaciones cambiaron en otra sesión. Vuelve a abrir el editor.");
     await t.set("card","shared",ESTIMATE_KEY,value);
