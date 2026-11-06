@@ -57,34 +57,11 @@ function addHoverPreview(link,card){
  link.addEventListener("blur",hide);
  link.setAttribute("aria-describedby","dependency-preview");
 }
-function referencesFromDescription(desc){
- const text=String(desc||"");
- const index=text.search(/^(?:\*\*)?Referencias(?:\*\*)?\s*$/im);
- if(index<0)return [];
- const tail=text.slice(index).split("\n").slice(1).join("\n");
- const end=tail.search(/^(?:#{1,6}\s+|\*\*[A-ZÁÉÍÓÚÜÑ][^\n]*\*\*\s*$)/m);
- const section=end>=0?tail.slice(0,end):tail;
- const links=[],seen=new Set();
- const rx=/\[([^\]\n]{2,100})\]\((https:\/\/[^\s)]+)\)/g;
- let match;
- while((match=rx.exec(section))&&links.length<5){
-  let url;try{url=new URL(match[2])}catch(_){continue}
-  if(!["github.com","trello.com"].includes(url.hostname))continue;
-  const canonical=url.href.replace(/#.*$/,"");
-  if(seen.has(canonical))continue;
-  seen.add(canonical);
-  links.push({label:match[1],url:url.href,host:url.hostname});
- }
- return links;
-}
-function referenceDescription(ref){
- const path=new URL(ref.url).pathname;
- if(/\/issues\/4\/?$/.test(path))return "Seguimiento del primer recorrido jugable: alcance, decisiones y criterios de entrega.";
- if(path.includes("vertical-slice-card-2026-11-06.md"))return "Archivo íntegro de la tarjeta antes de reorganizarla, con criterios y comentarios conservados.";
- if(path.includes("SIMULATION_CORE_V0_1.md"))return "Diseño y pruebas del núcleo comercial: productos, contenedores, ventas y estado.";
- if(path.includes("INVENTORY_LAB_V0_2.md"))return "Pruebas del inventario físico: colocar, mover, vender y guardar artículos.";
- if(ref.host==="trello.com")return "Tarjeta relacionada de Trello. Abre el enlace para consultar su estado y criterios.";
- return "Documento de desarrollo vinculado a esta tarea. Abre el enlace para consultar la evidencia completa.";
+function cardReferences(card){
+ const id=String(card.id||"");
+ const items=window.NBReferenceCatalog&&window.NBReferenceCatalog[id];
+ if(!Array.isArray(items))return [];
+ return items.filter(ref=>ref&&/^https:\/\/(?:github\.com|trello\.com)\//.test(ref.url)&&ref.label&&ref.summary).slice(0,5).map(ref=>({...ref,host:ref.url.includes("github.com")?"github.com":"trello.com"}));
 }
 function addReferenceHover(link,ref){
  const popup=el("dependency-preview");
@@ -92,7 +69,7 @@ function addReferenceHover(link,ref){
   popup.replaceChildren();
   const title=document.createElement("div");title.className="preview-title";title.textContent=ref.label;
   const source=document.createElement("div");source.className="preview-state";source.textContent=ref.host==="github.com"?"GitHub":"Trello";
-  const summary=document.createElement("div");summary.className="preview-desc";summary.textContent=referenceDescription(ref);
+  const summary=document.createElement("div");summary.className="preview-desc";summary.textContent=ref.summary;
   const hint=document.createElement("div");hint.className="preview-hint";hint.textContent="Clic para abrir la referencia";
   popup.append(title,source,summary,hint);
   popup.hidden=false;move(e);
@@ -112,8 +89,8 @@ function addReferenceHover(link,ref){
  link.addEventListener("blur",hide);
  link.setAttribute("aria-describedby","dependency-preview");
 }
-function renderReferences(desc){
- const refs=referencesFromDescription(desc);
+function renderReferences(card){
+ const refs=cardReferences(card);
  const section=el("references"),wrap=el("reference-links");
  wrap.replaceChildren();section.hidden=refs.length===0;
  for(const ref of refs){
@@ -142,7 +119,7 @@ function render(card,estimate,dependencies){
   });
   blocker.append(heading,details);blocker.hidden=false;
  }else blocker.hidden=true;
- renderReferences(card.desc);
+ renderReferences(card);
  setText("percent",progress===null?"—":progress+"%");
  setText("done",s.total?s.completed+" completados":"Sin criterios");
  setText("left",s.total?(s.total-s.completed)+" pendientes":"");
@@ -188,7 +165,7 @@ const loadingTimeout=window.setTimeout(function(){
 },9000);
 async function load(){
  try{
-  const [card,estimate]=await Promise.all([t.card("idList","desc","checklists","badges"),t.get("card","shared",KEY,{}).catch(()=>({}))]);
+  const [card,estimate]=await Promise.all([t.card("id","idList","desc","checklists","badges"),t.get("card","shared",KEY,{}).catch(()=>({}))]);
   let dependencies={blocked:false,dependencies:[],missing:[]};
   if(card.idList!==DONE && window.NBDependencies.readDependencyIds(card.desc).length){
     try{
