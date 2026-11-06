@@ -1,4 +1,4 @@
-name: NOTHING · Rebuild GitHub Pages
+name: NOTHING · Publicar Power-Up
 
 on:
   push:
@@ -14,18 +14,57 @@ on:
 permissions:
   contents: read
   pages: write
+  id-token: write
 
 concurrency:
-  group: nothing-pages-rebuild
+  group: nothing-pages-deploy
   cancel-in-progress: false
 
 jobs:
-  request-build:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Request a GitHub Pages build for latest main
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare ONLY static Power-Up files
+        shell: bash
         run: |
-          gh api --method POST "repos/${REPO}/pages/builds"
+          set -euo pipefail
+          mkdir -p _site
+          find . -maxdepth 1 -type f \
+            \( -name '*.html' -o -name '*.js' -o -name '*.css' -o -name '*.svg' \) \
+            -exec cp -t _site {} +
+          touch _site/.nojekyll
+          for file in index.html connector-v13.html connector-v17.html progress-panel.html progress-panel.js reference-catalog.js dependencies.js; do
+            test -s "_site/$file" || { echo "::error::Missing $file in Pages artifact"; exit 1; }
+          done
+          printf 'Prepared %s static files for commit %s\n' "$(find _site -type f | wc -l)" "$GITHUB_SHA"
+          ls -la _site
+
+      - name: Verify JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in _site/*.js; do
+            node --check "$file"
+          done
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
