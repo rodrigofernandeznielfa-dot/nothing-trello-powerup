@@ -20,21 +20,24 @@ function extract(card,estimate){
   const remaining=allKnown?pending.reduce((n,i)=>n+estimate[i.id],0):null;
   return {items,total,completed,remaining,hasDetailedItems:items.length>0};
 }
-function descriptionSummary(desc){
- const text=String(desc||"");
- const goal=text.match(/(?:^|\n)OBJETIVO\s*\n([\s\S]*?)(?=\n\s*\n|\n[A-ZÁÉÍÓÚÜÑ ]{5,}\n|$)/);
- const raw=goal?goal[1]:text.replace(/^NB_[^\n]+$/gm,"").replace(/^VISTA RAPIDA[^\n]*$/gm,"").trim();
- const clean=raw.replace(/\[[^\]]*\]\([^)]*\)/g,"").replace(/^[•✓*#\-\s]+/gm,"").replace(/\s+/g," ").trim();
- return clean.length>170?clean.slice(0,167).replace(/\s+\S*$/,"")+"…":clean||"Esta tarjeta no tiene resumen disponible.";
+function previewSummary(desc){
+ const match=String(desc||"").match(/^NB_PREVIEW_V1:\s*(.+)$/m);
+ if(!match)return "Resumen breve pendiente de preparar.";
+ const clean=match[1].replace(/\s+/g," ").trim();
+ return clean.length<=110?clean:"Resumen demasiado largo: revisar la ficha de esta tarea.";
+}
+function previewTitle(name){
+ const match=String(name||"").match(/NOTHING Studio\s+\d+/i);
+ return match?match[0]:String(name||"Tarjeta relacionada");
 }
 function addHoverPreview(link,card){
  const popup=el("dependency-preview");
  if(!popup)return;
  const show=(e)=>{
   popup.replaceChildren();
-  const title=document.createElement("div");title.className="preview-title";title.textContent=card.name||"Tarjeta relacionada";
+  const title=document.createElement("div");title.className="preview-title";title.textContent=previewTitle(card.name);
   const state=document.createElement("div");state.className="preview-state";state.textContent=card.idList===DONE?"Hecho":card.idList===TODO?"Por hacer":card.idList===DOING?"En curso":"Pendiente";
-  const desc=document.createElement("div");desc.className="preview-desc";desc.textContent=descriptionSummary(card.desc);
+  const desc=document.createElement("div");desc.className="preview-desc";desc.textContent=previewSummary(card.desc);
   const hint=document.createElement("div");hint.className="preview-hint";hint.textContent="Clic para abrir la tarjeta";
   popup.append(title,state,desc,hint);popup.hidden=false;
   place(e);
