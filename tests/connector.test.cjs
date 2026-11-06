@@ -82,3 +82,23 @@ test('unresponsive essential lookup returns an error before Trello abandons it',
 test('embedded helper matches the module used by the card panel',()=>{
   assert.equal(embedded.trim(),fs.readFileSync(path.join(root,'dependencies.js'),'utf8').trim());
 });
+
+test('readable dependency links preserve blocked state',async()=>{
+  const b=await setup()['card-badges'](client({
+    card:async()=>({idList:TODO,desc:'**Depende de**\n[Studio 01](https://trello.com/c/CPRnmJFc)\n\n**Objetivo**\nWork',badges:{checkItems:5}}),
+    cards:async()=>[{shortLink:'CPRnmJFc',name:'Studio 01',idList:TODO}]
+  }));
+  assert.equal(b[0].text,'Bloqueada');
+  assert.match(b[1].text,/0\/5/);
+});
+test('readable retrospective hours preserve the historical badge',async()=>{
+  const b=await setup()['card-badges'](client({card:async()=>({idList:DONE,desc:'**Resultado verificado**\nDone\n\n**Histórico de dedicación**\nAproximadamente 1,5 h. Estimación retrospectiva, no cronometrada.',badges:{checkItems:5,checkItemsChecked:5}})}));
+  assert.equal(b[1].text,'≈ 1.5 h');
+});
+test('helper reads human summaries, decimal ranges and only actual dependency sections',()=>{
+  const window={};vm.runInNewContext(embedded,{window});
+  const h=window.NBDependencies;
+  assert.equal(h.readPreview('**Resumen**\nShort summary.\n\n**Objetivo**\nLong objective.'),'Short summary.');
+  assert.deepEqual(plain(h.readHistoricHours('**Histórico de dedicación**\nAproximadamente 1,5–2,5 h. Not measured.')),{min:1.5,max:2.5});
+  assert.deepEqual(plain(h.readDependencyIds('**Objetivo**\nSee https://trello.com/c/CPRnmJFc')),[]);
+});

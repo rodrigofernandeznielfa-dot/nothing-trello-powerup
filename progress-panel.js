@@ -6,9 +6,9 @@ const KEY="nothing_estimates_v1";
 const el=id=>document.getElementById(id);
 function asHours(n){return Number.isFinite(n)?String(Math.round(n*10)/10).replace(".",",")+" h":"—"}
 function historic(desc){
-  const match=(desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\d+(?:\.\d+)?) max=(\d+(?:\.\d+)?)/);
-  if(!match)return null;
-  const a=Number(match[1]),b=Number(match[2]);
+  const value=window.NBDependencies.readHistoricHours(desc);
+  if(!value)return null;
+  const a=value.min,b=value.max;
   return a===b?"≈ "+asHours(a):"≈ "+asHours(a)+"–"+asHours(b);
 }
 function setText(id,value){el(id).textContent=value}
@@ -21,9 +21,9 @@ function extract(card,estimate){
   return {items,total,completed,remaining,hasDetailedItems:items.length>0};
 }
 function previewSummary(desc){
- const match=String(desc||"").match(/^NB_PREVIEW_V1:\s*(.+)$/m);
- if(!match)return "Resumen breve pendiente de preparar.";
- const clean=match[1].replace(/\s+/g," ").trim();
+ const summary=window.NBDependencies.readPreview(desc);
+ if(!summary)return "Resumen breve pendiente de preparar.";
+ const clean=summary.replace(/\s+/g," ").trim();
  return clean.length<=110?clean:"Resumen demasiado largo: revisar la ficha de esta tarea.";
 }
 function previewTitle(name){
