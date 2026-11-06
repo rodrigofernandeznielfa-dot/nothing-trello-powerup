@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NOTHING · Detalle de progreso</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;padding:14px;background:#161d22;color:#e7eeed;font:13px/1.45 system-ui,-apple-system,sans-serif}
+header,.between{display:flex;align-items:center;justify-content:space-between;gap:10px}
+header{margin-bottom:12px}h2{font-size:16px;margin:2px 0 0}h3{font-size:12px;margin:0 0 9px}
+.eyebrow,.muted,.small{color:#a6b5b8}.eyebrow{font-size:10px;letter-spacing:.09em;text-transform:uppercase}.small{font-size:11px}
+.tag{font-size:11px;padding:4px 8px;border-radius:20px;background:#34454b}
+.panel{background:#20292e;border:1px solid #39474d;border-radius:11px;padding:12px;margin:0 0 10px}
+.value{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums}.time{font-size:17px;font-weight:650}
+.track{display:flex;gap:3px;margin:10px 0 6px}.segment{height:11px;flex:1;background:#39484c;border-radius:3px}.segment.done{background:#48957b}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.list{padding:0;margin:0;list-style:none}.list li{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-top:1px solid #334047}.list li:first-child{border-top:0}
+.mark{font-weight:700;color:#8ed5b8}.todo{color:#b5c5c6}.grow{flex:1;min-width:0;overflow-wrap:anywhere}
+#next{border-left:3px solid #87c4ad;padding-left:9px;margin:0}
+.notice{border-left:3px solid #d9b87b;padding-left:9px;margin:6px 0 0}
+footer{font-size:10px;color:#a6b5b8;margin:12px 2px 0}
+#status{color:#a6b5b8}
+</style>
+<script src="https://p.trellocdn.com/power-up.min.js"></script>
+<script defer src="./progress-panel.js"></script>
+</head>
+<body>
+<header><div><div class="eyebrow">NOTHING · INDICADORES</div><h2>Estado del trabajo</h2></div><span class="tag" id="state">Cargando</span></header>
+<div id="status">Consultando los datos de esta tarjeta…</div>
+<main id="content" hidden>
+<section class="panel"><div class="between"><strong>Objetivos verificados</strong><span class="value" id="percent">—</span></div><div class="track" id="track" aria-hidden="true"></div><div class="between small"><span id="done">—</span><span id="left">—</span></div></section>
+<div class="grid"><section class="panel"><div class="muted small">Invertido</div><div class="time" id="spent">—</div><div class="small" id="spentCaption">Sin registro</div></section><section class="panel"><div class="muted small">Restante</div><div class="time" id="remaining">—</div><div class="small" id="remainCaption">Pendiente de estimar</div></section></div>
+<section class="panel"><h3>Etapas del trabajo</h3><ul class="list" id="steps"></ul></section>
+<section class="panel"><h3>Próximo paso</h3><p id="next">—</p><div id="warning"></div></section>
+</main>
+<footer>Las casillas cuentan criterios verificados; no miden porcentaje de código. Los tiempos históricos aproximados se indican con ≈.</footer>
+</body></html>
