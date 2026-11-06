@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           for file in _site/*.js; do
-            node --check "$file"
+            node --input-type=module --check < "$file"
           done
 
       - name: Upload Pages artifact
