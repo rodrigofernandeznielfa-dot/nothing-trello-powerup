@@ -57,6 +57,71 @@ function addHoverPreview(link,card){
  link.addEventListener("blur",hide);
  link.setAttribute("aria-describedby","dependency-preview");
 }
+function referencesFromDescription(desc){
+ const text=String(desc||"");
+ const index=text.search(/^(?:\\*\\*)?Referencias(?:\\*\\*)?\\s*$/im);
+ if(index<0)return [];
+ const tail=text.slice(index).split("\n").slice(1).join("\n");
+ const end=tail.search(/^(?:#{1,6}\\s+|\\*\\*[A-ZÁÉÍÓÚÜÑ][^\\n]*\\*\\*\\s*$)/m);
+ const section=end>=0?tail.slice(0,end):tail;
+ const links=[],seen=new Set();
+ const rx=/\\[([^\\]\\n]{2,100})\\]\\((https:\\/\\/[^\\s)]+)\\)/g;
+ let match;
+ while((match=rx.exec(section))&&links.length<5){
+  let url;try{url=new URL(match[2])}catch(_){continue}
+  if(!["github.com","trello.com"].includes(url.hostname))continue;
+  const canonical=url.href.replace(/#.*$/,"");
+  if(seen.has(canonical))continue;
+  seen.add(canonical);
+  links.push({label:match[1],url:url.href,host:url.hostname});
+ }
+ return links;
+}
+function referenceDescription(ref){
+ const path=new URL(ref.url).pathname;
+ if(/\\/issues\\/4\\/?$/.test(path))return "Seguimiento del primer recorrido jugable: alcance, decisiones y criterios de entrega.";
+ if(path.includes("vertical-slice-card-2026-11-06.md"))return "Archivo íntegro de la tarjeta antes de reorganizarla, con criterios y comentarios conservados.";
+ if(path.includes("SIMULATION_CORE_V0_1.md"))return "Diseño y pruebas del núcleo comercial: productos, contenedores, ventas y estado.";
+ if(path.includes("INVENTORY_LAB_V0_2.md"))return "Pruebas del inventario físico: colocar, mover, vender y guardar artículos.";
+ if(ref.host==="trello.com")return "Tarjeta relacionada de Trello. Abre el enlace para consultar su estado y criterios.";
+ return "Documento de desarrollo vinculado a esta tarea. Abre el enlace para consultar la evidencia completa.";
+}
+function addReferenceHover(link,ref){
+ const popup=el("dependency-preview");
+ const show=e=>{
+  popup.replaceChildren();
+  const title=document.createElement("div");title.className="preview-title";title.textContent=ref.label;
+  const source=document.createElement("div");source.className="preview-state";source.textContent=ref.host==="github.com"?"GitHub":"Trello";
+  const summary=document.createElement("div");summary.className="preview-desc";summary.textContent=referenceDescription(ref);
+  const hint=document.createElement("div");hint.className="preview-hint";hint.textContent="Clic para abrir la referencia";
+  popup.append(title,source,summary,hint);
+  popup.hidden=false;move(e);
+ };
+ const move=e=>{
+  if(popup.hidden)return;
+  const box=popup.getBoundingClientRect(),anchor=link.getBoundingClientRect();
+  const x=Math.min(Math.max(8,(e.clientX||anchor.left)+14),Math.max(8,innerWidth-box.width-8));
+  const y=Math.min(Math.max(8,(e.clientY||anchor.top)+14),Math.max(8,innerHeight-box.height-8));
+  popup.style.left=x+"px";popup.style.top=y+"px";
+ };
+ const hide=()=>popup.hidden=true;
+ link.addEventListener("pointerenter",show);
+ link.addEventListener("pointermove",move);
+ link.addEventListener("pointerleave",hide);
+ link.addEventListener("focus",show);
+ link.addEventListener("blur",hide);
+ link.setAttribute("aria-describedby","dependency-preview");
+}
+function renderReferences(desc){
+ const refs=referencesFromDescription(desc);
+ const section=el("references"),wrap=el("reference-links");
+ wrap.replaceChildren();section.hidden=refs.length===0;
+ for(const ref of refs){
+  const a=document.createElement("a");
+  a.textContent=ref.label;a.href=ref.url;a.target="_blank";a.rel="noopener noreferrer";
+  addReferenceHover(a,ref);wrap.append(a);
+ }
+}
 function render(card,estimate,dependencies){
  const s=extract(card,estimate||{});
  const finished=card.idList===DONE,progress=s.total?Math.round(s.completed*100/s.total):null;
@@ -77,6 +142,7 @@ function render(card,estimate,dependencies){
   });
   blocker.append(heading,details);blocker.hidden=false;
  }else blocker.hidden=true;
+ renderReferences(card.desc);
  setText("percent",progress===null?"—":progress+"%");
  setText("done",s.total?s.completed+" completados":"Sin criterios");
  setText("left",s.total?(s.total-s.completed)+" pendientes":"");
