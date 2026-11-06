@@ -1,36 +1,43 @@
 <!doctype html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NOTHING · Detalle de progreso</title>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NOTHING · Estado del trabajo</title>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}
-body{margin:0;padding:14px;background:#161d22;color:#e7eeed;font:13px/1.45 system-ui,-apple-system,sans-serif}
-header,.between{display:flex;align-items:center;justify-content:space-between;gap:10px}
-header{margin-bottom:12px}h2{font-size:16px;margin:2px 0 0}h3{font-size:12px;margin:0 0 9px}
-.eyebrow,.muted,.small{color:#a6b5b8}.eyebrow{font-size:10px;letter-spacing:.09em;text-transform:uppercase}.small{font-size:11px}
-.tag{font-size:11px;padding:4px 8px;border-radius:20px;background:#34454b}
-.panel{background:#20292e;border:1px solid #39474d;border-radius:11px;padding:12px;margin:0 0 10px}
-.value{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums}.time{font-size:17px;font-weight:650}
-.track{display:flex;gap:3px;margin:10px 0 6px}.segment{height:11px;flex:1;background:#39484c;border-radius:3px}.segment.done{background:#48957b}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.list{padding:0;margin:0;list-style:none}.list li{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-top:1px solid #334047}.list li:first-child{border-top:0}
-.mark{font-weight:700;color:#8ed5b8}.todo{color:#b5c5c6}.grow{flex:1;min-width:0;overflow-wrap:anywhere}
-#next{border-left:3px solid #87c4ad;padding-left:9px;margin:0}
-.notice{border-left:3px solid #d9b87b;padding-left:9px;margin:6px 0 0}
-footer{font-size:10px;color:#a6b5b8;margin:12px 2px 0}
-#status{color:#a6b5b8}
+:root{color-scheme:light}*{box-sizing:border-box}
+body{margin:0;padding:12px 14px;background:#fff;color:#172b4d;font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+header,.between{display:flex;align-items:center;justify-content:space-between;gap:9px}
+header{margin-bottom:10px}h2{font-size:14px;margin:0;font-weight:700}
+.small,.muted{color:#626f86;font-size:11px}
+.tag{background:#f1f2f4;color:#44546f;border-radius:5px;padding:4px 8px;font-size:11px}
+.summary{border:1px solid #dfe3e8;border-radius:9px;padding:12px;background:#fafbfc}
+.value{font-size:19px;font-weight:750;font-variant-numeric:tabular-nums}
+.track{display:flex;gap:3px;margin:9px 0 6px}.segment{flex:1;height:8px;background:#e4e8ed;border-radius:3px}.segment.done{background:#4b9b7a}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid #e4e8ed}
+.time{font-weight:700;font-size:16px;color:#172b4d}
+.next{margin-top:10px;padding:10px 12px;background:#f1f7f4;border-radius:8px;border-left:3px solid #4b9b7a}
+.next strong{font-size:11px;color:#44546f}.next p{margin:3px 0 0;overflow-wrap:anywhere}
+#status{color:#626f86;font-size:12px;padding:8px 0}
+#warning:not(:empty){margin-top:8px;color:#805900;font-size:11px}
+.notice{margin:3px 0}
+footer{margin-top:8px;font-size:10px;color:#626f86}
+[hidden]{display:none!important}
 </style>
 <script src="https://p.trellocdn.com/power-up.min.js"></script>
-<script defer src="./progress-panel.js"></script>
-</head>
-<body>
-<header><div><div class="eyebrow">NOTHING · INDICADORES</div><h2>Estado del trabajo</h2></div><span class="tag" id="state">Cargando</span></header>
-<div id="status">Consultando los datos de esta tarjeta…</div>
+<script defer src="./progress-panel.js?v=2"></script>
+</head><body>
+<header><h2>Estado del trabajo</h2><span class="tag" id="state">Cargando</span></header>
+<div id="status">Consultando datos…</div>
 <main id="content" hidden>
-<section class="panel"><div class="between"><strong>Objetivos verificados</strong><span class="value" id="percent">—</span></div><div class="track" id="track" aria-hidden="true"></div><div class="between small"><span id="done">—</span><span id="left">—</span></div></section>
-<div class="grid"><section class="panel"><div class="muted small">Invertido</div><div class="time" id="spent">—</div><div class="small" id="spentCaption">Sin registro</div></section><section class="panel"><div class="muted small">Restante</div><div class="time" id="remaining">—</div><div class="small" id="remainCaption">Pendiente de estimar</div></section></div>
-<section class="panel"><h3>Etapas del trabajo</h3><ul class="list" id="steps"></ul></section>
-<section class="panel"><h3>Próximo paso</h3><p id="next">—</p><div id="warning"></div></section>
+<div class="summary">
+ <div class="between"><span><strong>Progreso</strong> <span class="small" id="done"></span></span><span class="value" id="percent">—</span></div>
+ <div class="track" id="track" aria-hidden="true"></div><span id="left" class="small"></span>
+ <div class="grid">
+  <div><div class="muted">Invertido</div><div class="time" id="spent">—</div><div id="spentCaption" class="small" hidden></div></div>
+  <div><div class="muted">Por hacer</div><div class="time" id="remaining">—</div><div id="remainCaption" class="small" hidden></div></div>
+ </div>
+</div>
+<div class="next"><strong>Siguiente paso</strong><p id="next">—</p></div>
+<div id="warning" hidden></div>
+<ul id="steps" hidden></ul>
 </main>
-<footer>Las casillas cuentan criterios verificados; no miden porcentaje de código. Los tiempos históricos aproximados se indican con ≈.</footer>
+<footer>≈ indica una duración aproximada, no cronometrada.</footer>
 </body></html>
