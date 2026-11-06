@@ -23,7 +23,7 @@
     var known=!usingNative && pending.every(function(x){return typeof estimates[x.id]==="number" && Number.isFinite(estimates[x.id]) && estimates[x.id]>=0});
     var hours=known?pending.reduce(function(sum,x){return sum+estimates[x.id]},0):null;
     var percent=Math.round(done*100/total),filled=Math.round(percent/20);
-    var match=(card.desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\\d+(?:\\.\\d+)?) max=(\\d+(?:\\.\\d+)?)/);
+    var match=(card.desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\d+(?:\.\d+)?) max=(\d+(?:\.\d+)?)/);
     var historic=match?{min:Number(match[1]),max:Number(match[2])}:null;
     var timeText=card.idList===DONE
       ?(historic?"≈ "+historic.min+"–"+historic.max+" h históricas (estimadas)":"Histórico sin medir")
