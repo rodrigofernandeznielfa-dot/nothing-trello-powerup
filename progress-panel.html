@@ -13,6 +13,11 @@ header{margin-bottom:10px}h2{font-size:14px;margin:0;font-weight:700}
 .blocker strong{font-size:11px;font-weight:650}.blocker p{margin:3px 0 0;font-size:12px;line-height:1.45}
 .blocker a{color:#9a3535;font-weight:600;text-decoration:underline;text-underline-offset:2px}
 .blocker a:focus-visible{outline:2px solid #9a3535;outline-offset:2px}
+.preview{position:fixed;z-index:100;background:#fff;color:#172b4d;width:270px;max-width:calc(100vw - 18px);border:1px solid #dfe3e8;border-radius:9px;box-shadow:0 7px 22px rgba(23,43,77,.15);padding:11px 12px;pointer-events:none}
+.preview-title{font-size:12px;font-weight:700;line-height:1.35;margin-bottom:5px}
+.preview-state{display:inline-block;background:#f1f2f4;color:#44546f;border-radius:4px;padding:2px 6px;font-size:10px;margin-bottom:7px}
+.preview-desc{font-size:12px;color:#44546f;line-height:1.42;overflow-wrap:anywhere}
+.preview-hint{font-size:10px;color:#626f86;margin-top:7px}
 .summary{border:1px solid #dfe3e8;border-radius:9px;padding:12px;background:#fafbfc}
 .value{font-size:19px;font-weight:750;font-variant-numeric:tabular-nums}
 .track{display:flex;gap:3px;margin:9px 0 6px}.segment{flex:1;height:8px;background:#e4e8ed;border-radius:3px}.segment.done{background:#4b9b7a}
@@ -28,11 +33,12 @@ footer{margin-top:8px;font-size:10px;color:#626f86}
 </style>
 <script src="https://p.trellocdn.com/power-up.min.js"></script>
 <script src="./dependencies.js?v=1"></script>
-<script defer src="./progress-panel.js?v=6"></script>
+<script defer src="./progress-panel.js?v=7"></script>
 </head><body>
 <header><h2>Estado del trabajo</h2><span class="tag" id="state">Cargando</span></header>
 <div id="status">Consultando datos…</div>
 <div id="blocker" class="blocker" hidden></div>
+<div id="dependency-preview" class="preview" role="tooltip" hidden></div>
 <main id="content" hidden>
 <div class="summary">
  <div class="between"><span><strong>Progreso</strong> <span class="small" id="done"></span></span><span class="value" id="percent">—</span></div>
