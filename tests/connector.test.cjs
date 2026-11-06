@@ -5,13 +5,15 @@ const path=require('node:path');
 const vm=require('node:vm');
 const root=path.join(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'connector.html'),'utf8');
-const script=Array.from(html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)).map(m=>m[1]).join('\n');
+const scripts=Array.from(html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g));
+const script=scripts.filter(m=>!m[1].includes('nb-dependencies')).map(m=>m[2]).join('\n');
+const embedded=scripts.find(m=>m[1].includes('nb-dependencies'))[2];
 const TODO='6aec66ed3137d17f84ce7a3c',DONE='6aec66f2b6df305a261abb0b';
 function setup(withDependencies=true){
   let capabilities;
   const window={TrelloPowerUp:{initialize(value){capabilities=value;}}};
   const context=vm.createContext({window,Promise,console:{warn(){},error(){}},setTimeout,clearTimeout});
-  if(withDependencies)vm.runInContext(fs.readFileSync(path.join(root,'dependencies.js'),'utf8'),context);
+  if(withDependencies)vm.runInContext(embedded,context);
   vm.runInContext(script,context);
   return capabilities;
 }
@@ -26,7 +28,7 @@ const never=()=>new Promise(()=>{});
 test('registers every capability without loading the optional helper',()=>{
   const c=setup(false);
   assert.deepEqual(Object.keys(c).sort(),['card-back-section','card-badges','card-buttons','card-detail-badges']);
-  assert.match(html,/<script defer src="\.\/dependencies\.js/);
+  assert.ok(!/src="\.\/dependencies\.js/.test(html));
   assert.match(c['card-back-section'](client()).content.url,/^https:\/\//);
 });
 test('keeps verified native progress and unknown time',async()=>{
@@ -75,4 +77,8 @@ test('unresponsive essential lookup returns an error before Trello abandons it',
   const start=Date.now(),b=await setup()['card-badges'](client({card:never}));
   assert.equal(b[0].text,'NB · ERROR DE LECTURA');
   assert.ok(Date.now()-start<3500);
+});
+
+test('embedded helper matches the module used by the card panel',()=>{
+  assert.equal(embedded.trim(),fs.readFileSync(path.join(root,'dependencies.js'),'utf8').trim());
 });
