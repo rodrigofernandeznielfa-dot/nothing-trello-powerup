@@ -53,11 +53,24 @@ function render(card,estimate){
  warnings.forEach(w=>{const p=document.createElement("p");p.className="notice small";p.textContent=w;warning.append(p)});
  el("status").hidden=true;el("content").hidden=false;
 }
+let loaded=false;
+const loadingTimeout=window.setTimeout(function(){
+ if(!loaded){
+  el("status").textContent="La conexión con Trello está tardando demasiado. Cierra y vuelve a abrir la tarjeta.";
+  setText("state","Sin conexión");
+ }
+},9000);
 async function load(){
  try{
- const [card,estimate]=await Promise.all([t.card("idList","desc","checklists","badges"),t.get("card","shared",KEY,{}).catch(()=>({}))]);
- render(card,estimate||{});
- }catch(err){el("status").textContent="No se pudo cargar el detalle. Cierra y vuelve a abrir la tarjeta.";console.error("NOTHING panel",err)}
+  const [card,estimate]=await Promise.all([t.card("idList","desc","checklists","badges"),t.get("card","shared",KEY,{}).catch(()=>({}))]);
+  render(card,estimate||{});
+  loaded=true;window.clearTimeout(loadingTimeout);
+ }catch(err){
+  loaded=true;window.clearTimeout(loadingTimeout);
+  el("status").textContent="No se pudo leer la tarjeta. Cierra y vuelve a abrirla.";
+  setText("state","Error");
+  console.error("NOTHING panel",err);
+ }
 }
 t.render(load);
 load();
