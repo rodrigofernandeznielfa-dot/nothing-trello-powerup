@@ -9,6 +9,7 @@ on:
       - '*.css'
       - '*.svg'
       - '.github/workflows/rebuild-pages.yml'
+      - 'tests/**'
   workflow_dispatch:
 
 permissions:
@@ -52,6 +53,9 @@ jobs:
           for file in _site/*.js; do
             node --input-type=module --check < "$file"
           done
+
+      - name: Test connector startup and failed Trello requests
+        run: node --test tests/connector.test.cjs
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
