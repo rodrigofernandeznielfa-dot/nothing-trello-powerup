@@ -26,7 +26,7 @@
     var match=(card.desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\d+(?:\.\d+)?) max=(\d+(?:\.\d+)?)/);
     var historic=match?{min:Number(match[1]),max:Number(match[2])}:null;
     var timeText=card.idList===DONE
-      ?(historic?(historic.min===historic.max?"≈ "+historic.min+" h históricas (estimadas)":"≈ "+historic.min+"–"+historic.max+" h históricas (estimadas)"):"Tiempo de código: no medido")
+      ?(historic?(historic.min===historic.max?"≈ "+historic.min+" h":"≈ "+historic.min+"–"+historic.max+" h"):"Tiempo sin medir")
       :(hours===null?"Sin estimar":"⏱ "+Math.round(hours*10)/10+" h restantes");
     return [
       {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")",color:percent===100?"green":"blue"},
