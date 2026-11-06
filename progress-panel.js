@@ -20,6 +20,40 @@ function extract(card,estimate){
   const remaining=allKnown?pending.reduce((n,i)=>n+estimate[i.id],0):null;
   return {items,total,completed,remaining,hasDetailedItems:items.length>0};
 }
+function descriptionSummary(desc){
+ const text=String(desc||"");
+ const goal=text.match(/(?:^|\n)OBJETIVO\s*\n([\s\S]*?)(?=\n\s*\n|\n[A-ZÁÉÍÓÚÜÑ ]{5,}\n|$)/);
+ const raw=goal?goal[1]:text.replace(/^NB_[^\n]+$/gm,"").replace(/^VISTA RAPIDA[^\n]*$/gm,"").trim();
+ const clean=raw.replace(/\[[^\]]*\]\([^)]*\)/g,"").replace(/^[•✓*#\-\s]+/gm,"").replace(/\s+/g," ").trim();
+ return clean.length>170?clean.slice(0,167).replace(/\s+\S*$/,"")+"…":clean||"Esta tarjeta no tiene resumen disponible.";
+}
+function addHoverPreview(link,card){
+ const popup=el("dependency-preview");
+ if(!popup)return;
+ const show=(e)=>{
+  popup.replaceChildren();
+  const title=document.createElement("div");title.className="preview-title";title.textContent=card.name||"Tarjeta relacionada";
+  const state=document.createElement("div");state.className="preview-state";state.textContent=card.idList===DONE?"Hecho":card.idList===TODO?"Por hacer":card.idList===DOING?"En curso":"Pendiente";
+  const desc=document.createElement("div");desc.className="preview-desc";desc.textContent=descriptionSummary(card.desc);
+  const hint=document.createElement("div");hint.className="preview-hint";hint.textContent="Clic para abrir la tarjeta";
+  popup.append(title,state,desc,hint);popup.hidden=false;
+  place(e);
+ };
+ const place=(e)=>{
+  if(popup.hidden)return;
+  const rect=popup.getBoundingClientRect();
+  const x=Math.min(Math.max(8,(e.clientX||link.getBoundingClientRect().right)+14),Math.max(8,window.innerWidth-rect.width-8));
+  const y=Math.min(Math.max(8,(e.clientY||link.getBoundingClientRect().top)+14),Math.max(8,window.innerHeight-rect.height-8));
+  popup.style.left=x+"px";popup.style.top=y+"px";
+ };
+ const hide=()=>{popup.hidden=true};
+ link.addEventListener("pointerenter",show);
+ link.addEventListener("pointermove",place);
+ link.addEventListener("pointerleave",hide);
+ link.addEventListener("focus",show);
+ link.addEventListener("blur",hide);
+ link.setAttribute("aria-describedby","dependency-preview");
+}
 function render(card,estimate,dependencies){
  const s=extract(card,estimate||{});
  const finished=card.idList===DONE,progress=s.total?Math.round(s.completed*100/s.total):null;
@@ -36,6 +70,7 @@ function render(card,estimate,dependencies){
     link.href=dep.url;link.target="_blank";link.rel="noopener noreferrer";
     link.textContent=dep.name.replace(/^[^A-Za-z0-9]* /,"").split(" — ")[0];
     details.append(link);
+    addHoverPreview(link,dep);
   });
   blocker.append(heading,details);blocker.hidden=false;
  }else blocker.hidden=true;
@@ -88,8 +123,9 @@ async function load(){
   let dependencies={blocked:false,dependencies:[],missing:[]};
   if(card.idList!==DONE && window.NBDependencies.readDependencyIds(card.desc).length){
     try{
-      const cards=await t.cards("id","name","shortLink","idList");
+      const cards=await t.cards("id","name","shortLink","idList","desc");
       dependencies=window.NBDependencies.resolve(card.desc,cards,DONE);
+      dependencies.dependencies.forEach(dep=>{const source=cards.find(c=>c.shortLink===dep.id);if(source){dep.desc=source.desc;dep.idList=source.idList}});
     }catch(error){console.warn("NOTHING dependency lookup failed",error)}
   }
   render(card,estimate||{},dependencies);
