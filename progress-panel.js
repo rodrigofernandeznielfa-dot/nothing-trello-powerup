@@ -59,13 +59,13 @@ function addHoverPreview(link,card){
 }
 function referencesFromDescription(desc){
  const text=String(desc||"");
- const index=text.search(/^(?:\\*\\*)?Referencias(?:\\*\\*)?\\s*$/im);
+ const index=text.search(/^(?:\*\*)?Referencias(?:\*\*)?\s*$/im);
  if(index<0)return [];
  const tail=text.slice(index).split("\n").slice(1).join("\n");
- const end=tail.search(/^(?:#{1,6}\\s+|\\*\\*[A-ZÁÉÍÓÚÜÑ][^\\n]*\\*\\*\\s*$)/m);
+ const end=tail.search(/^(?:#{1,6}\s+|\*\*[A-ZÁÉÍÓÚÜÑ][^\n]*\*\*\s*$)/m);
  const section=end>=0?tail.slice(0,end):tail;
  const links=[],seen=new Set();
- const rx=/\\[([^\\]\\n]{2,100})\\]\\((https:\\/\\/[^\\s)]+)\\)/g;
+ const rx=/\[([^\]\n]{2,100})\]\((https:\/\/[^\s)]+)\)/g;
  let match;
  while((match=rx.exec(section))&&links.length<5){
   let url;try{url=new URL(match[2])}catch(_){continue}
@@ -79,7 +79,7 @@ function referencesFromDescription(desc){
 }
 function referenceDescription(ref){
  const path=new URL(ref.url).pathname;
- if(/\\/issues\\/4\\/?$/.test(path))return "Seguimiento del primer recorrido jugable: alcance, decisiones y criterios de entrega.";
+ if(/\/issues\/4\/?$/.test(path))return "Seguimiento del primer recorrido jugable: alcance, decisiones y criterios de entrega.";
  if(path.includes("vertical-slice-card-2026-11-06.md"))return "Archivo íntegro de la tarjeta antes de reorganizarla, con criterios y comentarios conservados.";
  if(path.includes("SIMULATION_CORE_V0_1.md"))return "Diseño y pruebas del núcleo comercial: productos, contenedores, ventas y estado.";
  if(path.includes("INVENTORY_LAB_V0_2.md"))return "Pruebas del inventario físico: colocar, mover, vender y guardar artículos.";
