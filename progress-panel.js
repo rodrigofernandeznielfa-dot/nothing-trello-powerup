@@ -28,13 +28,13 @@ function render(card,estimate,dependencies){
  el("state").classList.toggle("blocked",!!blocked);
  const blocker=el("blocker");blocker.replaceChildren();
  if(blocked){
-  const heading=document.createElement("strong");heading.textContent="Bloqueada · Falta completar:";
+  const heading=document.createElement("strong");heading.textContent="Depende de:";
   const details=document.createElement("p");
   dependencies.dependencies.forEach((dep,index)=>{
     if(index)details.append(document.createTextNode(" · "));
     const link=document.createElement("a");
     link.href=dep.url;link.target="_blank";link.rel="noopener noreferrer";
-    link.textContent=dep.name;
+    link.textContent=dep.name.replace(/^[^A-Za-z0-9]* /,"").split(" — ")[0];
     details.append(link);
   });
   blocker.append(heading,details);blocker.hidden=false;
@@ -60,19 +60,26 @@ function render(card,estimate,dependencies){
  });if(s.items.length>12){const li=document.createElement("li");li.className="small";li.textContent="Y "+(s.items.length-12)+" criterios más en la checklist de Trello";list.append(li)}}
  else{const li=document.createElement("li");li.className="muted";li.textContent=s.total?"Hay "+s.total+" criterios; el detalle no está disponible en esta vista.":"Esta tarjeta todavía no tiene checklist.";list.append(li)}
  const next=s.items.find(item=>!item.done);
- setText("next",finished?"Trabajo cerrado. Consulta la descripción y las evidencias de la tarjeta.":blocked?"Completar primero la tarea de la que depende.":next?next.name:"Revisar la descripción de la tarjeta para elegir el siguiente paso.");
+ setText("next",finished?"Trabajo cerrado. Consulta la descripción y las evidencias de la tarjeta.":blocked?"Continuaremos cuando se complete la dependencia.":next?next.name:"Revisar la descripción de la tarjeta para elegir el siguiente paso.");
  const warnings=[];
  if(!finished&&s.total&&s.completed===s.total)warnings.push("Checklist completa, pero la tarjeta todavía no está cerrada.");
  if(!finished&&s.remaining===null)warnings.push("Tiempo restante no calculable: faltan estimaciones o detalle de los criterios.");
  const warning=el("warning");warning.replaceChildren();
  warnings.forEach(w=>{const p=document.createElement("p");p.className="notice small";p.textContent=w;warning.append(p)});
  el("status").hidden=true;el("content").hidden=false;
+ resizePanel();
+}
+function resizePanel(){
+ if(typeof t.sizeTo==="function"){
+  Promise.resolve(t.sizeTo(document.body)).catch(function(e){console.warn("NOTHING resize",e)});
+ }
 }
 let loaded=false;
 const loadingTimeout=window.setTimeout(function(){
  if(!loaded){
   el("status").textContent="La conexión con Trello está tardando demasiado. Cierra y vuelve a abrir la tarjeta.";
   setText("state","Sin conexión");
+  resizePanel();
  }
 },9000);
 async function load(){
@@ -91,6 +98,7 @@ async function load(){
   loaded=true;window.clearTimeout(loadingTimeout);
   el("status").textContent="No se pudo leer la tarjeta. Cierra y vuelve a abrirla.";
   setText("state","Error");
+  resizePanel();
   console.error("NOTHING panel",err);
  }
 }
