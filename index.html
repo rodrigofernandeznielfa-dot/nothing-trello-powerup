@@ -1,7 +1,32 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NOTHING · Indicadores</title>
-<style>:root{color-scheme:dark}body{background:#151b1f;color:#e9eff1;font:14px/1.5 system-ui,sans-serif;padding:20px;margin:0}h1{font-size:18px}p{color:#b6c5cb}</style>
+<style>body{font:14px system-ui;background:#151b1f;color:#e9eff1;padding:16px}p{color:#b6c5cb}</style>
 <script src="https://p.trellocdn.com/power-up.min.js"></script>
-<script type="module" src="./connector.js"></script>
-</head><body><h1>NOTHING · Indicadores</h1><p>Progreso verificado y horas pendientes, directamente en las tarjetas.</p></body></html>
+<script>
+(function(){
+  "use strict";
+  var KEY="nothing_estimates_v1",IDEAS="6aec66eb5ff8ae196d37b7ca";
+  async function getBadges(t){
+    var data=await Promise.all([t.card("idList","checklists"),t.get("card","shared",KEY,{})]);
+    var card=data[0],estimates=data[1]||{};
+    if(card.idList===IDEAS)return [];
+    var items=(card.checklists||[]).reduce(function(a,c){return a.concat(c.checkItems||[])},[]);
+    if(!items.length)return [];
+    var done=items.filter(function(x){return x.state==="complete"}).length;
+    var pending=items.filter(function(x){return x.state!=="complete"});
+    var known=pending.every(function(x){return typeof estimates[x.id]==="number" && Number.isFinite(estimates[x.id]) && estimates[x.id]>=0});
+    var hours=known?pending.reduce(function(sum,x){return sum+estimates[x.id]},0):null;
+    var percent=Math.round(done*100/items.length),filled=Math.round(percent/20);
+    return [
+      {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+items.length+")",color:percent===100?"green":"blue"},
+      {text:hours===null?"Sin estimar":"⏱ "+Math.round(hours*10)/10+" h restantes",color:"light-gray"}
+    ];
+  }
+  window.TrelloPowerUp.initialize({
+    "card-buttons":function(t){return [{text:"NOTHING · Estimar criterios",condition:"always",callback:function(ctx){return ctx.popup({title:"Estimaciones de trabajo",url:"./estimate.html",height:420})}}]},
+    "card-badges":function(t){return [0,1].map(function(i){return {dynamic:async function(){try{var a=await getBadges(t);return Object.assign({refresh:60},a[i]||{text:""})}catch(e){console.error("NOTHING badge",e);return {text:"",refresh:60}}}}})},
+    "card-detail-badges":async function(t){try{var a=await getBadges(t);return a.map(function(x,i){return Object.assign({title:i?"Horas restantes":"Progreso verificado"},x)})}catch(e){console.error("NOTHING detail",e);return []}}
+  });
+})();
+</script></head><body><h1>NOTHING · Indicadores</h1><p>Progreso verificado y horas pendientes, directamente en las tarjetas.</p></body></html>
