@@ -39,7 +39,7 @@ jobs:
             \( -name '*.html' -o -name '*.js' -o -name '*.css' -o -name '*.svg' \) \
             -exec cp -t _site {} +
           touch _site/.nojekyll
-          for file in index.html connector-v13.html connector-v17.html progress-panel.html progress-panel.js reference-catalog.js dependencies.js; do
+          for file in index.html connector.html connector-v13.html connector-v17.html progress-panel.html progress-panel.js reference-catalog.js dependencies.js; do
             test -s "_site/$file" || { echo "::error::Missing $file in Pages artifact"; exit 1; }
           done
           printf 'Prepared %s static files for commit %s\n' "$(find _site -type f | wc -l)" "$GITHUB_SHA"
