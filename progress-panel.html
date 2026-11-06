@@ -7,7 +7,12 @@ body{margin:0;padding:12px 14px;background:#fff;color:#172b4d;font:13px/1.4 syst
 header,.between{display:flex;align-items:center;justify-content:space-between;gap:9px}
 header{margin-bottom:10px}h2{font-size:14px;margin:0;font-weight:700}
 .small,.muted{color:#626f86;font-size:11px}
-.tag{background:#f1f2f4;color:#44546f;border-radius:5px;padding:4px 8px;font-size:11px}
+.tag{background:#f1f2f4;color:#44546f;border-radius:5px;padding:4px 8px;font-size:11px;font-weight:650}
+.tag.blocked{background:#fce8e8;color:#a32424;border:1px solid #efb6b6}
+.blocker{background:#fff2f2;border:1px solid #f3c9c9;border-left:3px solid #cb4444;border-radius:7px;padding:9px 11px;margin-bottom:10px;color:#842525}
+.blocker strong{font-size:12px}.blocker p{margin:3px 0 0;font-size:12px}
+.blocker a{color:#9f2727;font-weight:650;text-decoration:underline;text-underline-offset:2px}
+.blocker a:focus-visible{outline:2px solid #b72828;outline-offset:2px}
 .summary{border:1px solid #dfe3e8;border-radius:9px;padding:12px;background:#fafbfc}
 .value{font-size:19px;font-weight:750;font-variant-numeric:tabular-nums}
 .track{display:flex;gap:3px;margin:9px 0 6px}.segment{flex:1;height:8px;background:#e4e8ed;border-radius:3px}.segment.done{background:#4b9b7a}
@@ -22,10 +27,12 @@ footer{margin-top:8px;font-size:10px;color:#626f86}
 [hidden]{display:none!important}
 </style>
 <script src="https://p.trellocdn.com/power-up.min.js"></script>
-<script defer src="./progress-panel.js?v=3"></script>
+<script src="./dependencies.js?v=1"></script>
+<script defer src="./progress-panel.js?v=4"></script>
 </head><body>
 <header><h2>Estado del trabajo</h2><span class="tag" id="state">Cargando</span></header>
 <div id="status">Consultando datos…</div>
+<div id="blocker" class="blocker" hidden></div>
 <main id="content" hidden>
 <div class="summary">
  <div class="between"><span><strong>Progreso</strong> <span class="small" id="done"></span></span><span class="value" id="percent">—</span></div>
