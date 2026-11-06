@@ -20,10 +20,25 @@ function extract(card,estimate){
   const remaining=allKnown?pending.reduce((n,i)=>n+estimate[i.id],0):null;
   return {items,total,completed,remaining,hasDetailedItems:items.length>0};
 }
-function render(card,estimate){
+function render(card,estimate,dependencies){
  const s=extract(card,estimate||{});
  const finished=card.idList===DONE,progress=s.total?Math.round(s.completed*100/s.total):null;
- setText("state",finished?"Hecho":card.idList===DOING?"En curso":card.idList===TODO?"Por hacer":"En seguimiento");
+ const blocked=!finished&&dependencies&&dependencies.blocked;
+ setText("state",blocked?"Bloqueada":finished?"Hecho":card.idList===DOING?"En curso":card.idList===TODO?"Por hacer":"En seguimiento");
+ el("state").classList.toggle("blocked",!!blocked);
+ const blocker=el("blocker");blocker.replaceChildren();
+ if(blocked){
+  const heading=document.createElement("strong");heading.textContent="Bloqueada · Falta completar:";
+  const details=document.createElement("p");
+  dependencies.dependencies.forEach((dep,index)=>{
+    if(index)details.append(document.createTextNode(" · "));
+    const link=document.createElement("a");
+    link.href=dep.url;link.target="_blank";link.rel="noopener noreferrer";
+    link.textContent=dep.name;
+    details.append(link);
+  });
+  blocker.append(heading,details);blocker.hidden=false;
+ }else blocker.hidden=true;
  setText("percent",progress===null?"—":progress+"%");
  setText("done",s.total?s.completed+" completados":"Sin criterios");
  setText("left",s.total?(s.total-s.completed)+" pendientes":"");
@@ -45,7 +60,7 @@ function render(card,estimate){
  });if(s.items.length>12){const li=document.createElement("li");li.className="small";li.textContent="Y "+(s.items.length-12)+" criterios más en la checklist de Trello";list.append(li)}}
  else{const li=document.createElement("li");li.className="muted";li.textContent=s.total?"Hay "+s.total+" criterios; el detalle no está disponible en esta vista.":"Esta tarjeta todavía no tiene checklist.";list.append(li)}
  const next=s.items.find(item=>!item.done);
- setText("next",finished?"Trabajo cerrado. Consulta la descripción y las evidencias de la tarjeta.":next?next.name:"Revisar la descripción de la tarjeta para elegir el siguiente paso.");
+ setText("next",finished?"Trabajo cerrado. Consulta la descripción y las evidencias de la tarjeta.":blocked?"Completar primero la tarea de la que depende.":next?next.name:"Revisar la descripción de la tarjeta para elegir el siguiente paso.");
  const warnings=[];
  if(!finished&&s.total&&s.completed===s.total)warnings.push("Checklist completa, pero la tarjeta todavía no está cerrada.");
  if(!finished&&s.remaining===null)warnings.push("Tiempo restante no calculable: faltan estimaciones o detalle de los criterios.");
@@ -63,7 +78,14 @@ const loadingTimeout=window.setTimeout(function(){
 async function load(){
  try{
   const [card,estimate]=await Promise.all([t.card("idList","desc","checklists","badges"),t.get("card","shared",KEY,{}).catch(()=>({}))]);
-  render(card,estimate||{});
+  let dependencies={blocked:false,dependencies:[],missing:[]};
+  if(card.idList!==DONE && window.NBDependencies.readDependencyIds(card.desc).length){
+    try{
+      const cards=await t.cards("id","name","shortLink","idList");
+      dependencies=window.NBDependencies.resolve(card.desc,cards,DONE);
+    }catch(error){console.warn("NOTHING dependency lookup failed",error)}
+  }
+  render(card,estimate||{},dependencies);
   loaded=true;window.clearTimeout(loadingTimeout);
  }catch(err){
   loaded=true;window.clearTimeout(loadingTimeout);
