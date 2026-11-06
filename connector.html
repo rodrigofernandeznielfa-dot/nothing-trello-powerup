@@ -8,11 +8,10 @@
 (function(){
   "use strict";
   var KEY="nothing_estimates_v1",IDEAS="6aec66eb5ff8ae196d37b7ca",DONE="6aec66f2b6df305a261abb0b";
-  async function getBadges(t,showSubtitle){
-    var data=await Promise.all([t.card("id","idList","checklists","badges","desc"),t.get("card","shared",KEY,{}).catch(function(){return {}})]);
+  async function getBadges(t){
+    var data=await Promise.all([t.card("idList","checklists","badges","desc"),t.get("card","shared",KEY,{}).catch(function(){return {}})]);
     var card=data[0],estimates=data[1]||{};
-    var subtitleBadge=showSubtitle && card.id==="6aeda75f37fef58165448316" ? [{text:"Diario y portafolio del desarrollo"}] : [];
-    if(card.idList===IDEAS)return subtitleBadge;
+    if(card.idList===IDEAS)return [];
     var ids=window.NBDependencies.readDependencyIds(card.desc);
     var dependencyStatus={blocked:false,dependencies:[],missing:[]};
     if(ids.length && card.idList!==DONE){
@@ -31,7 +30,7 @@
     var historicText=historic?(historic.min===historic.max?"≈ "+historic.min+" h":"≈ "+historic.min+"–"+historic.max+" h"):null;
     if(!items.length && !nativeTotal){
       var onlyTime=card.idList===DONE && historicText?[{text:historicText,color:"light-gray"}]:[];
-      return subtitleBadge.concat(blockedBadge?[blockedBadge].concat(onlyTime):onlyTime);
+      return blockedBadge?[blockedBadge].concat(onlyTime):onlyTime;
     }
     var usingNative=!items.length && nativeTotal>0;
     var done=usingNative?nativeDone:items.filter(function(x){return x.state==="complete"}).length;
@@ -47,7 +46,7 @@
       {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")",color:percent===100?"green":"blue"},
       {text:timeText,color:"light-gray"}
     ];
-    return subtitleBadge.concat(blockedBadge?[blockedBadge].concat(badges):badges);
+    return blockedBadge?[blockedBadge].concat(badges):badges;
   }
   window.TrelloPowerUp.initialize({
     "card-back-section":function(t){
@@ -63,8 +62,8 @@
     },
 
     "card-buttons":function(t){return [{text:"NOTHING · Estimar criterios",condition:"always",callback:function(ctx){return ctx.popup({title:"Estimaciones de trabajo",url:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/estimate.html",height:420})}}]},
-    "card-badges":async function(t){try{return await getBadges(t,true)}catch(e){console.error("NOTHING badge",e);return [{text:"NB · ERROR DE LECTURA",color:"red"}]}},
-    "card-detail-badges":async function(t){try{var a=await getBadges(t,false);return a.map(function(x,i){return Object.assign({title:x.color==="red"?"Dependencia pendiente":x.text.indexOf("▰")===0||x.text.indexOf("▱")===0?"Progreso verificado":"Tiempo"},x)})}catch(e){console.error("NOTHING detail",e);return []}}
+    "card-badges":async function(t){try{return await getBadges(t)}catch(e){console.error("NOTHING badge",e);return [{text:"NB · ERROR DE LECTURA",color:"red"}]}},
+    "card-detail-badges":async function(t){try{var a=await getBadges(t);return a.map(function(x,i){return Object.assign({title:x.color==="red"?"Dependencia pendiente":x.text.indexOf("▰")===0||x.text.indexOf("▱")===0?"Progreso verificado":"Tiempo"},x)})}catch(e){console.error("NOTHING detail",e);return []}}
   });
 })();
 </script></head><body><h1>NOTHING · Indicadores</h1><p>Progreso verificado y horas pendientes, directamente en las tarjetas.</p></body></html>
