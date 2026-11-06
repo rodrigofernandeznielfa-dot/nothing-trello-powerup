@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NOTHING · Indicadores v15</title>
+<style>body{font:14px system-ui;background:#151b1f;color:#e9eff1;padding:16px}p{color:#b6c5cb}</style>
+<script src="https://p.trellocdn.com/power-up.min.js"></script>
+<script src="./dependencies.js?v=1"></script>
+<script>
+(function(){
+  "use strict";
+  var KEY="nothing_estimates_v1",IDEAS="6aec66eb5ff8ae196d37b7ca",DONE="6aec66f2b6df305a261abb0b";
+  async function getBadges(t){
+    var data=await Promise.all([t.card("idList","checklists","badges","desc"),t.get("card","shared",KEY,{}).catch(function(){return {}})]);
+    var card=data[0],estimates=data[1]||{};
+    if(card.idList===IDEAS)return [];
+    var ids=window.NBDependencies.readDependencyIds(card.desc);
+    var dependencyStatus={blocked:false,dependencies:[],missing:[]};
+    if(ids.length && card.idList!==DONE){
+      try{
+        var boardCards=await t.cards("id","name","shortLink","idList");
+        dependencyStatus=window.NBDependencies.resolve(card.desc,boardCards,DONE);
+      }catch(e){console.warn("NOTHING dependency unavailable",e);}
+    }
+    var blockedBadge=dependencyStatus.blocked?{text:"Bloqueada",color:"red"}:null;
+    var items=(card.checklists||[]).reduce(function(a,c){return a.concat(c.checkItems||[])},[]);
+    var native=card.badges||{};
+    var nativeTotal=Number(native.checkItems)||0;
+    var nativeDone=Number(native.checkItemsChecked)||0;
+    var match=(card.desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\d+(?:\.\d+)?) max=(\d+(?:\.\d+)?)/);
+    var historic=match?{min:Number(match[1]),max:Number(match[2])}:null;
+    var historicText=historic?(historic.min===historic.max?"≈ "+historic.min+" h":"≈ "+historic.min+"–"+historic.max+" h"):null;
+    if(!items.length && !nativeTotal){
+      var onlyTime=card.idList===DONE && historicText?[{text:historicText,color:"light-gray"}]:[];
+      return blockedBadge?[blockedBadge].concat(onlyTime):onlyTime;
+    }
+    var usingNative=!items.length && nativeTotal>0;
+    var done=usingNative?nativeDone:items.filter(function(x){return x.state==="complete"}).length;
+    var total=usingNative?nativeTotal:items.length;
+    var pending=items.filter(function(x){return x.state!=="complete"});
+    var known=!usingNative && pending.every(function(x){return typeof estimates[x.id]==="number" && Number.isFinite(estimates[x.id]) && estimates[x.id]>=0});
+    var hours=known?pending.reduce(function(sum,x){return sum+estimates[x.id]},0):null;
+    var percent=Math.round(done*100/total),filled=Math.round(percent/20);
+    var timeText=card.idList===DONE
+      ?(historicText||"Tiempo sin medir")
+      :(hours===null?"Sin estimar":"⏱ "+Math.round(hours*10)/10+" h restantes");
+    var badges=[
+      {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")",color:percent===100?"green":"blue"},
+      {text:timeText,color:"light-gray"}
+    ];
+    return blockedBadge?[blockedBadge].concat(badges):badges;
+  }
+  window.TrelloPowerUp.initialize({
+    "card-back-section":function(t){
+      return {
+        title:"NOTHING · Estado del trabajo",
+        icon:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/panel-icon.svg",
+        content:{
+          type:"iframe",
+          url:t.signUrl("./progress-panel.html?v=10"),
+          height:355
+        }
+      };
+    },
+
+    "card-buttons":function(t){return [{text:"NOTHING · Estimar criterios",condition:"always",callback:function(ctx){return ctx.popup({title:"Estimaciones de trabajo",url:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/estimate.html",height:420})}}]},
+    "card-badges":async function(t){try{return await getBadges(t)}catch(e){console.error("NOTHING badge",e);return [{text:"NB · ERROR DE LECTURA",color:"red"}]}},
+    "card-detail-badges":async function(t){try{var a=await getBadges(t);return a.map(function(x,i){return Object.assign({title:x.color==="red"?"Dependencia pendiente":x.text.indexOf("▰")===0||x.text.indexOf("▱")===0?"Progreso verificado":"Tiempo"},x)})}catch(e){console.error("NOTHING detail",e);return []}}
+  });
+})();
+</script></head><body><h1>NOTHING · Indicadores</h1><p>Progreso verificado y horas pendientes, directamente en las tarjetas.</p></body></html>
