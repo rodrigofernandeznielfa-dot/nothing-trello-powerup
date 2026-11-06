@@ -1,0 +1,31 @@
+name: NOTHING · Rebuild GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*.html'
+      - '*.js'
+      - '*.css'
+      - '*.svg'
+      - '.github/workflows/rebuild-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+
+concurrency:
+  group: nothing-pages-rebuild
+  cancel-in-progress: false
+
+jobs:
+  request-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request a GitHub Pages build for latest main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --method POST "repos/${REPO}/pages/builds"
