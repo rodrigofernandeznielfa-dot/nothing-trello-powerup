@@ -201,6 +201,12 @@ test('every historical connector shows estimated hours with only badge counts an
       idList:TODO,desc,checklists:[],badges:{checkItems:7,checkItemsChecked:0}
     })}));
     assert.equal(badge[1].text,'⏱ ≈ 14,5 h prev. · 14,5 h quedan',file+' displayed '+badge[1]?.text);
+    const finished=await capabilities['card-badges'](client({card:async()=>({
+      idList:DONE,desc:'**DEDICACIÓN**\\nAproximadamente 2 h, estimación retrospectiva.',
+      checklists:[],badges:{checkItems:5,checkItemsChecked:5}
+    })}));
+    assert.equal(finished[1]?.text,'⏱ 2 h',file+' must show clean completed effort');
+    assert.equal(finished.length,2,file+' must not add a redundant zero-hour badge');
   }
 });
 
