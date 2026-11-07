@@ -1,26 +1,168 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NOTHING · Indicadores v7</title>
+<title>NOTHING · Indicadores · Compatibilidad connector-v7.html</title>
 <style>body{font:14px system-ui;background:#151b1f;color:#e9eff1;padding:16px}p{color:#b6c5cb}</style>
 <script src="https://p.trellocdn.com/power-up.min.js"></script>
+<!-- Embedded from dependencies.js; a regression test keeps the copies identical. -->
+<script id="nb-dependencies">
+(function(root){
+"use strict";
+function headingKey(value){
+ return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase();
+}
+function readSection(desc,heading){
+ const lines=String(desc||"").replace(/\r/g,"").split("\n");
+ const start=lines.findIndex(line=>{
+  const found=line.trim().match(/^\*\*([^*]+)\*\*$/);
+  return found && headingKey(found[1])===headingKey(heading);
+ });
+ if(start<0)return "";
+ const result=[];
+ for(const line of lines.slice(start+1)){
+  if(/^\*\*[^*]+\*\*\s*$/.test(line.trim()))break;
+  result.push(line);
+ }
+ return result.join("\n").trim();
+}
+function readDependencyIds(desc){
+ const legacy=String(desc||"").match(/^NB_DEPENDENCIES_V1:\s*([A-Za-z0-9,\s-]+)$/m);
+ const ids=legacy?legacy[1].split(",").map(x=>x.trim())
+  :Array.from(readSection(desc,"Depende de").matchAll(/https:\/\/trello\.com\/c\/([A-Za-z0-9]{8})(?=[/)\s]|$)/g),m=>m[1]);
+ return [...new Set(ids.filter(x=>/^[A-Za-z0-9]{8}$/.test(x)))].slice(0,12);
+}
+function readHistoricHours(desc){
+ const legacy=String(desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\d+(?:\.\d+)?) max=(\d+(?:\.\d+)?)/);
+ const section=readSection(desc,"Dedicación")||readSection(desc,"Histórico de dedicación");
+ const readable=section.match(/^Aproximadamente (\d+(?:[.,]\d+)?)(?:[–-](\d+(?:[.,]\d+)?))? h\./i);
+ const m=legacy||readable;
+ if(!m)return null;
+ const min=Number(m[1].replace(",",".")),max=Number((m[2]||m[1]).replace(",","."));
+ return Number.isFinite(min)&&Number.isFinite(max)&&min>=0&&max>=min?{min,max}:null;
+}
+function readPreview(desc){
+ const old=String(desc||"").match(/^NB_PREVIEW_V1:\s*(.+)$/m);
+ if(old)return old[1];
+ const section=readSection(desc,"Resumen");
+ if(section)return section.split(/\n\s*\n/)[0].trim();
+ const parts=String(desc||"").replace(/\r/g,"").split("\n");
+ if(/^\*\*[^*]+\*\*$/.test((parts[0]||"").trim()))return (parts[1]||"").trim();
+ return "";
+}
+function readCriterionHours(name){
+ // Editable, visible work estimate on a native Trello check item:
+ // "Revisar el diseño · ≈ 2,5 h". No other numbers are treated as hours.
+ const m=String(name||"").match(/\s[·•]\s≈\s*(\d+(?:[.,]\d+)?)\s*h\s*$/i);
+ if(!m)return null;
+ const h=Number(m[1].replace(",","."));
+ return Number.isFinite(h)&&h>=0&&h<=999?h:null;
+}
+function readTimePlan(checklists,estimates){
+ const manual=estimates&&typeof estimates==="object"&&!Array.isArray(estimates)?estimates:{};
+ const items=(Array.isArray(checklists)?checklists:[]).flatMap(c=>
+   (Array.isArray(c.checkItems)?c.checkItems:[]).map(item=>({id:item.id,name:item.name,
+     done:String(item.state).toLowerCase()==="complete"}))
+ );
+ let planned=0,remaining=0,estimatedCount=0;
+ for(const item of items){
+  // Existing Power-Up values take precedence. We never overwrite saved edits.
+  const explicit=manual[item.id];
+  const hours=typeof explicit==="number"&&Number.isFinite(explicit)&&explicit>=0&&explicit<=999
+    ?explicit:readCriterionHours(item.name);
+  if(hours===null)continue;
+  estimatedCount++;
+  planned+=hours;
+  if(!item.done)remaining+=hours;
+ }
+ if(!estimatedCount)return null;
+ const rounded=x=>Math.round(x*10)/10;
+ return {planned:rounded(planned),remaining:rounded(remaining),estimatedCount,totalItems:items.length,
+   completedEffort:rounded(planned-remaining)};
+}
+// Human-readable summary stored in the card description as a fallback for
+// Trello's card-badges context, where checkItems may not be provided.
+function readTimeSummary(desc){
+ const section=readSection(desc,"ESTIMACIÓN DE TRABAJO");
+ if(!section)return null;
+ const match=section.match(/Previsto:\s*≈?\s*(\d+(?:[.,]\d+)?)\s*h\s*[·|/]\s*Pendiente:\s*≈?\s*(\d+(?:[.,]\d+)?)\s*h/i);
+ const progress=section.match(/Referencia:\s*(\d+)\s*\/\s*(\d+)\s*criterios/i);
+ if(!match||!progress)return null;
+ const planned=Number(match[1].replace(",",".")),remaining=Number(match[2].replace(",","."));
+ const done=Number(progress[1]),total=Number(progress[2]);
+ if(![planned,remaining,done,total].every(Number.isFinite) || planned<0 || remaining<0 || remaining>planned || done<0 || total<1 || done>total)return null;
+ return {planned,remaining,done,total};
+}
+function resolve(desc,cards,doneListId){
+ const ids=readDependencyIds(desc);
+ if(!ids.length)return {blocked:false,dependencies:[],missing:[]};
+ const mapped=new Map((Array.isArray(cards)?cards:[]).filter(Boolean).map(card=>[card.shortLink,card]));
+ const unresolved=[],missing=[];
+ for(const id of ids){
+  const card=mapped.get(id);
+  if(!card){missing.push(id);continue}
+  if(card.idList!==doneListId)unresolved.push({id,name:card.name||"Tarjeta "+id,url:"https://trello.com/c/"+id});
+ }
+ return {blocked:unresolved.length>0,dependencies:unresolved,missing};
+}
+root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan,readTimeSummary};
+})(typeof window!=="undefined"?window:globalThis);
+</script>
 <script>
 (function(){
   "use strict";
-  var KEY="nothing_estimates_v1",IDEAS="6aec66eb5ff8ae196d37b7ca",DONE="6aec66f2b6df305a261abb0b";
+  var KEY="nothing_estimates_v1",SNAP="nothing_work_snapshot_v1",IDEAS="6aec66eb5ff8ae196d37b7ca",DONE="6aec66f2b6df305a261abb0b";
+  // Trello normally abandons capability replies after five seconds.
+  function within(promise,ms){
+    return new Promise(function(resolve,reject){
+      var timer=setTimeout(function(){reject(new Error("NOTHING request timeout"))},ms);
+      Promise.resolve(promise).then(function(value){clearTimeout(timer);resolve(value)},function(error){clearTimeout(timer);reject(error)});
+    });
+  }
   async function getBadges(t){
-    var data=await Promise.all([t.card("idList","checklists","badges","desc"),t.get("card","shared",KEY,{}).catch(function(){return {}})]);
-    var card=data[0],estimates=data[1]||{};
+    var data=await Promise.all([
+      within(t.card("idList","checklists","badges","desc"),1500),
+      within(t.get("card","shared",KEY,{}),900).catch(function(){return {}}),
+      within(t.get("card","shared",SNAP,{}),900).catch(function(){return {}})
+    ]);
+    var card=data[0],estimates=data[1]||{},snapshot=data[2]||{};
     if(card.idList===IDEAS)return [];
+    var dependencyReader=window.NBDependencies;
+    var ids=dependencyReader?dependencyReader.readDependencyIds(card.desc):[];
+    var dependencyUnknown=!dependencyReader && /^(?:NB_DEPENDENCIES_V1:|\*\*Depende de\*\*)/m.test(card.desc||"");
+    var dependencyStatus={blocked:false,dependencies:[],missing:[]};
+    if(ids.length && card.idList!==DONE){
+      try{
+        var boardCards=await within(t.cards("id","name","shortLink","idList"),1000);
+        dependencyStatus=dependencyReader.resolve(card.desc,boardCards,DONE);
+        dependencyUnknown=dependencyStatus.missing.length>0;
+      }catch(e){dependencyUnknown=true;console.warn("NOTHING dependency unavailable",e);}
+    }
+    var blockedBadge=dependencyStatus.blocked?{text:"Bloqueada",color:"red"}
+      :dependencyUnknown && card.idList!==DONE?{text:"Dependencias sin comprobar",color:"orange"}:null;
     var items=(card.checklists||[]).reduce(function(a,c){return a.concat(c.checkItems||[])},[]);
     var native=card.badges||{};
     var nativeTotal=Number(native.checkItems)||0;
     var nativeDone=Number(native.checkItemsChecked)||0;
-    var match=(card.desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\d+(?:\.\d+)?) max=(\d+(?:\.\d+)?)/);
-    var historic=match?{min:Number(match[1]),max:Number(match[2])}:null;
+    var historic=dependencyReader?dependencyReader.readHistoricHours(card.desc):null;
     var historicText=historic?(historic.min===historic.max?"≈ "+historic.min+" h":"≈ "+historic.min+"–"+historic.max+" h"):null;
     if(!items.length && !nativeTotal){
-      return card.idList===DONE && historicText?[{text:historicText,color:"light-gray"}]:[];
+      var onlyTime=card.idList===DONE && historicText?[{text:historicText,color:"light-gray"}]:[];
+      return blockedBadge?[blockedBadge].concat(onlyTime):onlyTime;
     }
+    var plan=dependencyReader?dependencyReader.readTimePlan(card.checklists||[],estimates):null;
+    var persisted=dependencyReader?dependencyReader.readTimeSummary(card.desc):null;
+    var isSnapshotValid=function(p){return p && typeof p.planned==="number" && typeof p.remaining==="number" &&
+      p.planned>=p.remaining && p.remaining>=0 && p.done===nativeDone && p.total===nativeTotal};
+    var fallback=null,stale=false;
+    if(!plan){
+      if(isSnapshotValid(snapshot))fallback=snapshot;
+      else if(isSnapshotValid(persisted))fallback=persisted;
+      else {
+        fallback=(snapshot && typeof snapshot.planned==="number")?snapshot:persisted;
+        stale=Boolean(fallback);
+      }
+    }
+    var effective=plan||fallback;
+    var fmtHour=function(n){return String(Math.round(n*10)/10).replace(".",",")};
     var usingNative=!items.length && nativeTotal>0;
     var done=usingNative?nativeDone:items.filter(function(x){return x.state==="complete"}).length;
     var total=usingNative?nativeTotal:items.length;
@@ -29,12 +171,16 @@
     var hours=known?pending.reduce(function(sum,x){return sum+estimates[x.id]},0):null;
     var percent=Math.round(done*100/total),filled=Math.round(percent/20);
     var timeText=card.idList===DONE
-      ?(historicText||"Tiempo sin medir")
-      :(hours===null?"Sin estimar":"⏱ "+Math.round(hours*10)/10+" h restantes");
-    return [
+      ?(historicText?historicText+" dedicadas · 0 h pendientes":"0 h pendientes · dedicación sin medir")
+      :(effective?(stale
+       ?"⏱ ≈ "+fmtHour(effective.planned)+" h prev. · revisar pendiente"
+       :"⏱ ≈ "+fmtHour(effective.planned)+" h prev. · "+fmtHour(effective.remaining)+" h quedan")
+       :hours===null?"⏱ Sin estimar":"⏱ "+Math.round(hours*10)/10+" h pendientes");
+    var badges=[
       {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")",color:percent===100?"green":"blue"},
       {text:timeText,color:"light-gray"}
     ];
+    return blockedBadge?[blockedBadge].concat(badges):badges;
   }
   window.TrelloPowerUp.initialize({
     "card-back-section":function(t){
@@ -43,15 +189,15 @@
         icon:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/panel-icon.svg",
         content:{
           type:"iframe",
-          url:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/progress-panel.html?v=2",
-          height:290
+          url:t.signUrl("https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/progress-panel.html?v=13"),
+          height:355
         }
       };
     },
 
-    "card-buttons":function(t){return [{text:"NOTHING · Estimar criterios",condition:"always",callback:function(ctx){return ctx.popup({title:"Estimaciones de trabajo",url:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/estimate.html",height:420})}}]},
+    "card-buttons":function(t){return [{text:"NOTHING · Estimar criterios",condition:"always",callback:function(ctx){return ctx.popup({title:"Estimaciones de trabajo",url:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/estimate.html?v=2",height:420})}}]},
     "card-badges":async function(t){try{return await getBadges(t)}catch(e){console.error("NOTHING badge",e);return [{text:"NB · ERROR DE LECTURA",color:"red"}]}},
-    "card-detail-badges":async function(t){try{var a=await getBadges(t);return a.map(function(x,i){return Object.assign({title:i?"Horas restantes":"Progreso verificado"},x)})}catch(e){console.error("NOTHING detail",e);return []}}
+    "card-detail-badges":async function(t){try{var a=await getBadges(t);return a.map(function(x,i){return Object.assign({title:x.color==="red"||x.color==="orange"?"Dependencias":x.text.indexOf("▰")===0||x.text.indexOf("▱")===0?"Progreso verificado":"Tiempo"},x)})}catch(e){console.error("NOTHING detail",e);return [{title:"NOTHING",text:"Error de lectura · reabrir tarjeta",color:"orange"}]}}
   });
 })();
 </script></head><body><h1>NOTHING · Indicadores</h1><p>Progreso verificado y horas pendientes, directamente en las tarjetas.</p></body></html>
