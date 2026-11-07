@@ -27,8 +27,8 @@ header{margin-bottom:10px}h2{font-size:14px;margin:0;font-weight:700}
 .summary{border:1px solid #dfe3e8;border-radius:9px;padding:12px;background:#fafbfc}
 .value{font-size:19px;font-weight:750;font-variant-numeric:tabular-nums}
 .track{display:flex;gap:3px;margin:9px 0 6px}.segment{flex:1;height:8px;background:#e4e8ed;border-radius:3px}.segment.done{background:#4b9b7a}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid #e4e8ed}
-.time{font-weight:700;font-size:16px;color:#172b4d}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid #e4e8ed}
+.time{font-weight:700;font-size:15px;color:#172b4d;overflow-wrap:anywhere}
 .next{margin-top:10px;padding:10px 12px;background:#f1f7f4;border-radius:8px;border-left:3px solid #4b9b7a}
 .next strong{font-size:11px;color:#44546f}.next p{margin:3px 0 0;overflow-wrap:anywhere}
 #status{color:#626f86;font-size:12px;padding:8px 0}
@@ -40,7 +40,7 @@ footer{margin-top:8px;font-size:10px;color:#626f86}
 <script src="https://p.trellocdn.com/power-up.min.js"></script>
 <script src="./dependencies.js?v=2"></script>
 <script src="./reference-catalog.js?v=2"></script>
-<script defer src="./progress-panel.js?v=12"></script>
+<script defer src="./progress-panel.js?v=13"></script>
 </head><body>
 <header><h2>Estado del trabajo</h2><span class="tag" id="state">Cargando</span></header>
 <div id="status">Consultando datos…</div>
@@ -51,8 +51,9 @@ footer{margin-top:8px;font-size:10px;color:#626f86}
  <div class="between"><span><strong>Progreso</strong> <span class="small" id="done"></span></span><span class="value" id="percent">—</span></div>
  <div class="track" id="track" aria-hidden="true"></div><span id="left" class="small"></span>
  <div class="grid">
-  <div><div class="muted">Invertido</div><div class="time" id="spent">—</div><div id="spentCaption" class="small" hidden></div></div>
-  <div><div class="muted">Por hacer</div><div class="time" id="remaining">—</div><div id="remainCaption" class="small" hidden></div></div>
+  <div><div class="muted">Previsto</div><div class="time" id="planned">—</div><div id="plannedCaption" class="small"></div></div>
+  <div><div class="muted">Pendiente</div><div class="time" id="remaining">—</div><div id="remainCaption" class="small"></div></div>
+  <div><div class="muted">Invertido</div><div class="time" id="spent">—</div><div id="spentCaption" class="small"></div></div>
  </div>
 </div>
 <div class="next"><strong>Siguiente paso</strong><p id="next">—</p></div>
@@ -60,5 +61,5 @@ footer{margin-top:8px;font-size:10px;color:#626f86}
 <div id="warning" hidden></div>
 <ul id="steps" hidden></ul>
 </main>
-<footer>≈ indica una duración aproximada, no cronometrada.</footer>
+<footer>≈ son estimaciones de esfuerzo, no plazos de calendario ni horas cronometradas. Las horas pendientes bajan al completar tareas estimadas.</footer>
 </body></html>
