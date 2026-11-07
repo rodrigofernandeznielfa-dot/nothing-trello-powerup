@@ -32,6 +32,11 @@ jobs:
           NODE_PATH: ${{ runner.temp }}/nb-browser/node_modules
           NB_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/nb-panel-evidence
         run: node tests/browser-panel.cjs
+      - name: Render human-controlled next-task recommendation
+        env:
+          NODE_PATH: ${{ runner.temp }}/nb-browser/node_modules
+          NB_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/nb-panel-evidence
+        run: node tests/browser-recommendation.cjs
       - name: Preserve rendered regression evidence
         if: always()
         uses: actions/upload-artifact@v4

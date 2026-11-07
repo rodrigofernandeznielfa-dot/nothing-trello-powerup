@@ -93,6 +93,36 @@ function hasUnestimatedCompleted(plan,done){
  // cannot prove zero effort for already-completed criteria without cost coverage.
  return done>0&&plan.planned===plan.remaining&&plan.estimatedCompletedCount!==done;
 }
+// A recommendation is authored after a project review, never inferred from
+// progress percentages, age, labels or a card's position. Decisions belong to
+// that exact text, so changing the proposal requires a new human decision.
+function readRecommendation(desc){
+ const source=readSection(desc,"PROPUESTA DE SIGUIENTE TAREA");
+ if(!source||source.length>1600)return null;
+ const fields={};
+ for(const line of source.split("\n")){
+  const match=line.match(/^([^:]+):\s*(.+)$/);
+  if(match)fields[headingKey(match[1])]=match[2].trim();
+ }
+ if(!fields.accion||!fields.motivo||!fields.resultado||!/^\d{4}-\d{2}-\d{2}$/.test(fields.revision||""))return null;
+ return {source,action:fields.accion,reason:fields.motivo,outcome:fields.resultado,reviewed:fields.revision};
+}
+function recommendationFor(card,decision){
+ if(!card||card.idList!=="6aec66ed3137d17f84ce7a3c"||card.closed)return null;
+ const proposal=readRecommendation(card.desc);
+ if(!proposal)return null;
+ const choice=decision&&decision.source===proposal.source&&["accepted","dismissed"].includes(decision.choice)
+  ?decision.choice:"pending";
+ return {...proposal,choice:decision&&decision.unavailable?"unavailable":choice};
+}
+function recommendationBadge(card,decision,waiting){
+ const proposal=recommendationFor(card,decision);
+ if(!proposal||proposal.choice==="dismissed")return null;
+ if(proposal.choice==="unavailable")return {text:"Propuesta · revisar decisión",color:"yellow"};
+ if(waiting)return {text:proposal.choice==="accepted"?"Elegida · en espera":"Propuesta · en espera",color:"yellow"};
+ return proposal.choice==="accepted"?{text:"Próxima acordada",color:"green"}
+  :{text:"Propuesta · siguiente tarea",color:"yellow"};
+}
 function resolve(desc,cards,doneListId){
  const ids=readDependencyIds(desc);
  if(!ids.length)return {blocked:false,dependencies:[],missing:[]};
@@ -105,5 +135,5 @@ function resolve(desc,cards,doneListId){
  }
  return {blocked:unresolved.length>0,dependencies:unresolved,missing};
 }
-root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan,readTimeSummary,hasUnestimatedCompleted};
+root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan,readTimeSummary,hasUnestimatedCompleted,readRecommendation,recommendationFor,recommendationBadge};
 })(typeof window!=="undefined"?window:globalThis);

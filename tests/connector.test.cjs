@@ -239,3 +239,46 @@ test('completed cards without checklists keep the historic-only badge if recorde
   })}));
   assert.deepEqual(plain(badges),[{text:'⏱ 1,5 h',color:'light-gray'}]);
 });
+
+const proposalDescription=require('./fixtures/recommendation.cjs');
+const decisionKey='nothing_next_task_decision_v1';
+function recommendedClient({choice,unavailable=false,desc=proposalDescription(),idList=TODO}={}){
+ const source=desc.split('**PROPUESTA DE SIGUIENTE TAREA**\n')[1];
+ return client({card:async()=>({idList,desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}}),
+  get:async(scope,visibility,key)=>{if(key!==decisionKey)return {};if(unavailable)throw Error('unavailable');return choice?{source,choice}:{};}});
+}
+test('yellow next-task badge is explicit, works without checklist and has a distinct detail title',async()=>{
+ const c=setup(),t=recommendedClient();
+ assert.deepEqual(plain(await c['card-badges'](t)),[{text:'Propuesta · siguiente tarea',color:'yellow'}]);
+ assert.equal((await c['card-detail-badges'](t))[0].title,'Propuesta de siguiente tarea');
+});
+test('accepted proposal becomes agreed, dismissed disappears, unknown decision stays unconfirmed',async()=>{
+ const c=setup();
+ assert.equal((await c['card-badges'](recommendedClient({choice:'accepted'})))[0].text,'Próxima acordada');
+ assert.deepEqual(plain(await c['card-badges'](recommendedClient({choice:'dismissed'}))),[]);
+ assert.match((await c['card-badges'](recommendedClient({unavailable:true})))[0].text,/revisar decisión/);
+});
+test('changed recommendation cannot inherit an earlier acceptance',async()=>{
+ const t=recommendedClient({choice:'accepted'}),old=t.get;
+ t.card=async()=>({idList:TODO,desc:proposalDescription().replace('Motivo: La prueba','Motivo: Otra prueba'),badges:{checkItems:0}});
+ const b=await setup()['card-badges'](t);assert.equal(b[0].text,'Propuesta · siguiente tarea');
+});
+test('red blockers remain first and a blocked recommendation is never presented as ready',async()=>{
+ const t=recommendedClient({choice:'accepted'}),original=t.card;
+ t.card=async()=>({...await original(),desc:proposalDescription()+'\n\n**DEPENDE DE**\nhttps://trello.com/c/CPRnmJFc'});
+ t.cards=async()=>[{shortLink:'CPRnmJFc',name:'Example prerequisite',idList:TODO}];
+ // Recreate the matching accepted source; the following section is not part of it.
+ t.get=async(scope,visibility,key)=>key===decisionKey?{source:proposalDescription().split('**PROPUESTA DE SIGUIENTE TAREA**\n')[1],choice:'accepted'}:{};
+ const badges=await setup()['card-badges'](t);assert.equal(badges[0].color,'red');assert.equal(badges[1].text,'Elegida · en espera');assert.equal(badges[1].color,'yellow');
+});
+test('recommendations never appear in ideas, current work or completed cards',async()=>{
+ for(const idList of ['6aec66eb5ff8ae196d37b7ca','6aec66f02d325131dd44f8d8',DONE]){
+  const b=await setup()['card-badges'](recommendedClient({idList}));assert.ok(!b.some(x=>x.color==='yellow'||/Próxima/.test(x.text)));
+ }
+});
+
+test('all 18 configured URLs serve the same stable connector, including recommendations',()=>{
+ for(const file of ['index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
+  assert.equal(fs.readFileSync(path.join(root,file),'utf8'),html,file);
+ }
+});

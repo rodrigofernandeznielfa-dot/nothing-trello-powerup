@@ -8,20 +8,20 @@ const DOING='6aec66f02d325131dd44f8d8',DONE='6aec66f2b6df305a261abb0b';
 // Synthetic arithmetic fixture, not a copy of any private card description.
 const summary=(done=4)=>'**ESTIMACIÓN DE TRABAJO**\nPrevisto: ≈ 5 h · Pendiente: ≈ 1,5 h\nReferencia: '+done+'/5 criterios completos';
 class Element{
-  constructor(){this.textContent='';this.children=[];this.hidden=false;this.style={};this.classList={toggle(){}};}
+  constructor(){this.textContent='';this.children=[];this.hidden=false;this.style={};this.classList={toggle(){}};this.events={};}
   replaceChildren(...children){this.children=children;}
   append(...children){this.children.push(...children);}
-  addEventListener(){}
+  addEventListener(name,callback){this.events[name]=callback;}
   setAttribute(){}
 }
-async function panel(card,{estimate={},cached={},getFails=false,writeFails=false}={}){
+async function panel(card,{estimate={},cached={},getFails=false,writeFails=false,decision={},writable=false,recommendationReadFails=false,recommendationReadHangs=false}={}){
   const elements=new Map();
   for(const id of fs.readFileSync(path.join(root,'progress-panel.html'),'utf8').matchAll(/id="([^"]+)"/g))elements.set(id[1],new Element());
   elements.get('content').hidden=true;
   const writes=[];
-  const client={card:async()=>card,cards:async()=>[],render(){},sizeTo:async()=>{},
-    get:async(model,visibility,key)=>{if(getFails)throw Error('unavailable');return key==='nothing_estimates_v1'?estimate:cached},
-    set:async(model,visibility,key,value)=>{if(writeFails)throw Error('readonly');writes.push({key,value})}};
+  const client={card:async()=>card,cards:async()=>[],render(){},sizeTo:async()=>{},memberCanWriteToModel:()=>writable,
+    get:async(model,visibility,key)=>{if(recommendationReadHangs&&key==='nothing_next_task_decision_v1')return new Promise(()=>{});if(getFails||(recommendationReadFails&&key==='nothing_next_task_decision_v1'))throw Error('unavailable');return key==='nothing_estimates_v1'?estimate:key==='nothing_next_task_decision_v1'?decision:cached},
+    set:async(model,visibility,key,value)=>{if(writeFails)throw Error('readonly');writes.push({key,value});if(key==='nothing_next_task_decision_v1')decision=value}};
   const document={body:new Element(),getElementById:id=>{assert.ok(elements.has(id),'Missing element '+id);return elements.get(id)},createElement:()=>new Element(),createTextNode:text=>({textContent:text})};
   const timers=new Set();
   const window={TrelloPowerUp:{iframe:()=>client},setTimeout:(fn,ms)=>{const id=setTimeout(fn,ms);timers.add(id);return id},clearTimeout:id=>{clearTimeout(id);timers.delete(id)}};
@@ -29,9 +29,9 @@ async function panel(card,{estimate={},cached={},getFails=false,writeFails=false
   vm.runInContext(fs.readFileSync(path.join(root,'dependencies.js'),'utf8'),context);
   vm.runInContext(fs.readFileSync(path.join(root,'progress-panel.js'),'utf8'),context);
   try{
-    for(let i=0;i<50&&elements.get('content').hidden;i++)await new Promise(resolve=>setTimeout(resolve,2));
+    for(let i=0;i<1000&&elements.get('content').hidden;i++)await new Promise(resolve=>setTimeout(resolve,2));
     assert.equal(elements.get('content').hidden,false,'Panel did not finish rendering: '+elements.get('status').textContent);
-    return {text:id=>elements.get(id).textContent,node:id=>elements.get(id),writes};
+    return {text:id=>elements.get(id).textContent,node:id=>elements.get(id),writes,click:async id=>elements.get(id).events.click()};
   }finally{for(const timer of timers)clearTimeout(timer)}
 }
 const card=(overrides={})=>({id:'synthetic',idList:DOING,desc:summary(),checklists:[],badges:{checkItems:5,checkItemsChecked:4},...overrides});
@@ -96,9 +96,9 @@ test('zero remaining/completed estimates are valid and readonly cache errors do 
 });
 test('every supported connector reloads the corrected card panel',()=>{
   const html=fs.readFileSync(path.join(root,'progress-panel.html'),'utf8');
-  assert.match(html,/progress-panel\.js\?v=15/);assert.match(html,/dependencies\.js\?v=5/);
+  assert.match(html,/progress-panel\.js\?v=16/);assert.match(html,/dependencies\.js\?v=6/);
   for(const file of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
-    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=15/,file);
+    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=16/,file);
   }
 });
 
@@ -128,4 +128,49 @@ test('legacy cache without coverage never implies zero hours for nine completed 
 test('explicitly estimated zero-hour completed work stays zero, rather than being treated as missing',async()=>{
  const p=await panel(card({desc:'',badges:{checkItems:1,checkItemsChecked:1},checklists:[{checkItems:[{id:'zero',name:'Sin esfuerzo · ≈ 0 h',state:'complete'}]}]}));
  assert.equal(p.text('planned'),'≈ 0 h');assert.equal(p.text('spent'),'≈ 0 h');
+});
+
+const proposalDescription=require('./fixtures/recommendation.cjs');
+const TODO='6aec66ed3137d17f84ce7a3c';
+const proposalCard=()=>card({idList:TODO,desc:proposalDescription(),badges:{checkItems:0,checkItemsChecked:0}});
+test('recommendation is yellow and read-only until the user explicitly decides',async()=>{
+ const p=await panel(proposalCard(),{writable:true});
+ assert.equal(p.node('recommendation').hidden,false);
+ assert.match(p.text('recommendation-title'),/Propuesta/);
+ assert.equal(p.node('recommendation-accept').disabled,false);
+ assert.equal(p.writes.filter(x=>x.key==='nothing_next_task_decision_v1').length,0);
+ assert.match(p.text('recommendation-status'),/Ningún botón mueve/);
+});
+test('accept, reconsider and park only write the exact proposal decision',async()=>{
+ const fixture=proposalCard(),p=await panel(fixture,{writable:true});
+ await p.click('recommendation-accept');
+ assert.equal(p.writes.length,1);assert.equal(p.writes[0].key,'nothing_next_task_decision_v1');
+ assert.equal(p.writes[0].value.choice,'accepted');assert.match(p.text('recommendation-title'),/acordada/);
+ assert.equal(fixture.idList,TODO);assert.equal(p.node('recommendation-actions').hidden,true);
+ await p.click('recommendation-reconsider');await p.click('recommendation-dismiss');
+ assert.deepEqual(p.writes.map(x=>x.value.choice),['accepted','pending','dismissed']);
+ assert.match(p.text('recommendation-title'),/aparcada/);assert.equal(fixture.idList,TODO);
+});
+test('readonly users and unavailable decisions never get write controls',async()=>{
+ for(const options of [{writable:false},{writable:true,recommendationReadFails:true}]){
+  const p=await panel(proposalCard(),options);assert.equal(p.node('recommendation-accept').disabled,true);await p.click('recommendation-accept');assert.equal(p.writes.length,0);
+ }
+});
+test('proposal changes require a new decision and block a stale click',async()=>{
+ const fixture=proposalCard(),p=await panel(fixture,{writable:true});fixture.desc+=' updated';
+ await p.click('recommendation-accept');assert.equal(p.writes.length,0);assert.match(p.text('recommendation-status'),/ha cambiado/);
+});
+test('failed writes never display a saved or accepted decision',async()=>{
+ const p=await panel(proposalCard(),{writable:true,writeFails:true});await p.click('recommendation-accept');
+ assert.match(p.text('recommendation-title'),/Propuesta/);assert.match(p.text('recommendation-status'),/No se ha podido confirmar/);assert.equal(p.node('recommendation-accept').disabled,true);
+});
+test('ideas, active and finished cards have no next-task proposal',async()=>{
+ for(const idList of ['6aec66eb5ff8ae196d37b7ca',DOING,DONE]){
+  const p=await panel({...proposalCard(),idList});assert.equal(p.node('recommendation').hidden,true);
+ }
+});
+
+test('hanging recommendation lookup cannot hide the existing progress panel',async()=>{
+ const started=Date.now(),p=await panel(proposalCard(),{writable:true,recommendationReadHangs:true});
+ assert.match(p.text('recommendation-status'),/No se ha podido comprobar/);assert.equal(p.node('recommendation-accept').disabled,true);assert.ok(Date.now()-started<2000);
 });

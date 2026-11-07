@@ -30,3 +30,31 @@ Probar la tienda con el repartidor · ≈ 3,5 h
 - `estimate.html` + `estimate.js` + `core.js`: edición opcional del esfuerzo.
 - Ejecutar `node --test tests/*.test.cjs`. La PR valida sin desplegar. El workflow GitHub Pages de main publica solo tras integrar cambios probados y compara los archivos publicados con ese mismo commit.
 - El repositorio del Power-Up es público: **nunca** almacenar en él descripciones privadas de fichas, credenciales, secretos ni información interna del juego. Las estimaciones y decisiones concretas permanecen en Trello y documentación privada de NOTHING BITES.
+
+## Propuesta amarilla de siguiente tarea
+
+La sugerencia nace de una revisión del proyecto completo en ChatGPT: tareas activas y pendientes, resultados comprobados, dependencias y estado técnico en GitHub. El Power-Up presenta esa conclusión; no ejecuta una IA en segundo plano ni decide a partir de porcentajes, horas, etiquetas o posición de tarjetas.
+
+- **Rojo:** bloqueo por una dependencia sin resolver.
+- **Amarillo — Propuesta · siguiente tarea:** recomendación pendiente de la decisión del propietario. El panel explica acción, motivo, resultado esperado y fecha de revisión.
+- **Aceptar propuesta:** registra la elección y muestra **Próxima acordada**. Para comenzar se mantiene el flujo habitual: el propietario elige la tarjeta en EN CURSO y dice «Mira Trello». No mueve tarjetas, no inicia agentes, no modifica código ni aprueba costes o assets.
+- La respuesta guardada no envía un mensaje a ChatGPT ni inicia una revisión. El conector de lectura de tarjetas no expone estos datos del Power-Up; ChatGPT respeta la selección manual en EN CURSO y cualquier decisión explícita del propietario.
+- **Ahora no:** aparca esa propuesta y retira su insignia amarilla. El panel conserva el motivo y permite revisar la decisión.
+- Una propuesta editada requiere una decisión nueva: no hereda una aceptación de otro texto. Un fallo de lectura o de escritura no se presenta como aceptación guardada.
+- Si hay bloqueo o dependencias sin comprobar, la sugerencia queda **en espera**; aceptarla no elimina el bloqueo.
+- Solo se propone trabajo de **POR HACER**. No se muestran estas prioridades en IDEAS, EN CURSO ni HECHO. El orden manual y la tarea activa se conservan.
+- Mantener **una sola propuesta operativa** tras cada revisión global; al cambiar de candidata, actualizar el análisis y retirar la sección de la anterior. Una elección del propietario no se sustituye silenciosamente: se explica cualquier propuesta alternativa.
+
+La conclusión se conserva de forma legible en la tarjeta candidata, sin contenido privado en este repositorio público:
+
+```text
+**PROPUESTA DE SIGUIENTE TAREA**
+Acción: Comprobar un recorrido completo de ejemplo.
+Motivo: La prueba conecta piezas ya disponibles antes de ampliar el alcance.
+Resultado: Un recorrido repetible y sus incidencias registradas.
+Revisión: 2026-11-07
+```
+
+El panel escribe únicamente la respuesta explícita del usuario en `nothing_next_task_decision_v1` (datos compartidos de esa tarjeta), manteniendo las estimaciones separadas. Requiere permiso de edición; los lectores ven la propuesta sin controles de escritura. La lectura opcional tiene un tiempo límite para no ocultar progreso/horas ante una conexión lenta. La sección se limita a 1600 caracteres para mantener pequeñas las respuestas guardadas; si Trello rechaza un guardado, el panel lo indica sin reintentar automáticamente.
+
+Las pruebas incluyen las regresiones de horas y progreso, ausencia de escrituras al abrir, decisión por teclado, aceptar/aparcar/reconsiderar, propuesta modificada, lectura y escritura fallidas, permisos y reflujo a 320 px. Los navegadores de CI usan datos sintéticos y una frontera Trello simulada: no son evidencia de una sesión autenticada en el tablero del propietario.

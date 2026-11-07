@@ -1,0 +1,2 @@
+// Generic test copy. No private project descriptions or decisions live here.
+module.exports=function recommendationDescription(){return '**EXAMPLE TASK**\nA small workflow to verify.\n\n**PROPUESTA DE SIGUIENTE TAREA**\nAcción: Comprobar un recorrido completo de ejemplo.\nMotivo: La prueba conecta las piezas ya disponibles y descubre fallos antes de ampliar el alcance.\nResultado: Un recorrido repetible con sus incidencias registradas.\nRevisión: 2026-11-07';};
