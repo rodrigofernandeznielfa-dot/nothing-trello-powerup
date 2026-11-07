@@ -143,11 +143,11 @@ test('v2 uppercase Trello headings preserve dependencies, time and summary',()=>
 test('all supported entrypoints show planned and remaining effort, not the obsolete time badge',async()=>{
   for(const file of ['connector.html','connector-v17.html','index.html']){
     const htmlText=fs.readFileSync(path.join(root,file),'utf8');
-    const parts=Array.from(htmlText.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/g));
+    const parts=Array.from(htmlText.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g));
     const helper=parts.find(part=>part[1].includes('nb-dependencies'));
     assert.ok(helper,file+' has embedded estimate helper');
     assert.equal(helper[2].trim(),fs.readFileSync(path.join(root,'dependencies.js'),'utf8').trim());
-    const js=parts.filter(part=>!part[1].includes('nb-dependencies')).map(part=>part[2]).join('\\n');
+    const js=parts.filter(part=>!part[1].includes('nb-dependencies')).map(part=>part[2]).join('\n');
     let capabilities;
     const window={TrelloPowerUp:{initialize(data){capabilities=data}}};
     const context=vm.createContext({window,Promise,setTimeout,clearTimeout,console:{warn(){},error(){}}});
