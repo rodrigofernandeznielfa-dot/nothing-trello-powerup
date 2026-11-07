@@ -78,6 +78,19 @@ function readTimePlan(checklists,estimates){
  return {planned:rounded(planned),remaining:rounded(remaining),estimatedCount,totalItems:items.length,
    completedEffort:rounded(planned-remaining)};
 }
+// Human-readable summary stored in the card description as a fallback for
+// Trello's card-badges context, where checkItems may not be provided.
+function readTimeSummary(desc){
+ const section=readSection(desc,"ESTIMACIÓN DE TRABAJO");
+ if(!section)return null;
+ const match=section.match(/Previsto:\s*≈?\s*(\d+(?:[.,]\d+)?)\s*h\s*[·|/]\s*Pendiente:\s*≈?\s*(\d+(?:[.,]\d+)?)\s*h/i);
+ const progress=section.match(/Referencia:\s*(\d+)\s*\/\s*(\d+)\s*criterios/i);
+ if(!match||!progress)return null;
+ const planned=Number(match[1].replace(",",".")),remaining=Number(match[2].replace(",","."));
+ const done=Number(progress[1]),total=Number(progress[2]);
+ if(![planned,remaining,done,total].every(Number.isFinite) || planned<0 || remaining<0 || remaining>planned || done<0 || total<1 || done>total)return null;
+ return {planned,remaining,done,total};
+}
 function resolve(desc,cards,doneListId){
  const ids=readDependencyIds(desc);
  if(!ids.length)return {blocked:false,dependencies:[],missing:[]};
@@ -90,13 +103,13 @@ function resolve(desc,cards,doneListId){
  }
  return {blocked:unresolved.length>0,dependencies:unresolved,missing};
 }
-root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan};
+root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan,readTimeSummary};
 })(typeof window!=="undefined"?window:globalThis);
 </script>
 <script>
 (function(){
   "use strict";
-  var KEY="nothing_estimates_v1",IDEAS="6aec66eb5ff8ae196d37b7ca",DONE="6aec66f2b6df305a261abb0b";
+  var KEY="nothing_estimates_v1",SNAP="nothing_work_snapshot_v1",IDEAS="6aec66eb5ff8ae196d37b7ca",DONE="6aec66f2b6df305a261abb0b";
   // Trello normally abandons capability replies after five seconds.
   function within(promise,ms){
     return new Promise(function(resolve,reject){
@@ -107,9 +120,10 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
   async function getBadges(t){
     var data=await Promise.all([
       within(t.card("idList","checklists","badges","desc"),1500),
-      within(t.get("card","shared",KEY,{}),900).catch(function(){return {}})
+      within(t.get("card","shared",KEY,{}),900).catch(function(){return {}}),
+      within(t.get("card","shared",SNAP,{}),900).catch(function(){return {}})
     ]);
-    var card=data[0],estimates=data[1]||{};
+    var card=data[0],estimates=data[1]||{},snapshot=data[2]||{};
     if(card.idList===IDEAS)return [];
     var dependencyReader=window.NBDependencies;
     var ids=dependencyReader?dependencyReader.readDependencyIds(card.desc):[];
@@ -135,6 +149,19 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
       return blockedBadge?[blockedBadge].concat(onlyTime):onlyTime;
     }
     var plan=dependencyReader?dependencyReader.readTimePlan(card.checklists||[],estimates):null;
+    var persisted=dependencyReader?dependencyReader.readTimeSummary(card.desc):null;
+    var isSnapshotValid=function(p){return p && typeof p.planned==="number" && typeof p.remaining==="number" &&
+      p.planned>=p.remaining && p.remaining>=0 && p.done===nativeDone && p.total===nativeTotal};
+    var fallback=null,stale=false;
+    if(!plan){
+      if(isSnapshotValid(snapshot))fallback=snapshot;
+      else if(isSnapshotValid(persisted))fallback=persisted;
+      else {
+        fallback=(snapshot && typeof snapshot.planned==="number")?snapshot:persisted;
+        stale=Boolean(fallback);
+      }
+    }
+    var effective=plan||fallback;
     var fmtHour=function(n){return String(Math.round(n*10)/10).replace(".",",")};
     var usingNative=!items.length && nativeTotal>0;
     var done=usingNative?nativeDone:items.filter(function(x){return x.state==="complete"}).length;
@@ -145,8 +172,10 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
     var percent=Math.round(done*100/total),filled=Math.round(percent/20);
     var timeText=card.idList===DONE
       ?(historicText?historicText+" dedicadas · 0 h pendientes":"0 h pendientes · dedicación sin medir")
-      :(plan?"⏱ ≈ "+fmtHour(plan.planned)+" h previstas · "+fmtHour(plan.remaining)+" h pendientes"
-        :hours===null?"⏱ Sin estimar":"⏱ "+Math.round(hours*10)/10+" h pendientes");
+      :(effective?(stale
+       ?"⏱ ≈ "+fmtHour(effective.planned)+" h prev. · revisar pendiente"
+       :"⏱ ≈ "+fmtHour(effective.planned)+" h prev. · "+fmtHour(effective.remaining)+" h quedan")
+       :hours===null?"⏱ Sin estimar":"⏱ "+Math.round(hours*10)/10+" h pendientes");
     var badges=[
       {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")",color:percent===100?"green":"blue"},
       {text:timeText,color:"light-gray"}
