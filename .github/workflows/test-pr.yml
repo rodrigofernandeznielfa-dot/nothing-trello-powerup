@@ -24,4 +24,4 @@ jobs:
         run: |
           for f in *.js; do node --input-type=module --check < "$f"; done
       - name: Test Power-Up and embedded connector
-        run: node --test tests/connector.test.cjs
+        run: node --test tests/*.test.cjs

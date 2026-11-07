@@ -77,7 +77,7 @@ function readTimeSummary(desc){
  const section=readSection(desc,"ESTIMACIÓN DE TRABAJO");
  if(!section)return null;
  const match=section.match(/Previsto:\s*≈?\s*(\d+(?:[.,]\d+)?)\s*h\s*[·|/]\s*Pendiente:\s*≈?\s*(\d+(?:[.,]\d+)?)\s*h/i);
- const progress=section.match(/Referencia:\s*(\d+)\s*\/\s*(\d+)\s*criterios/i);
+ const progress=section.match(/(?:Referencia:\s*)?(\d+)\s*\/\s*(\d+)\s*criterios/i);
  if(!match||!progress)return null;
  const planned=Number(match[1].replace(",",".")),remaining=Number(match[2].replace(",","."));
  const done=Number(progress[1]),total=Number(progress[2]);
