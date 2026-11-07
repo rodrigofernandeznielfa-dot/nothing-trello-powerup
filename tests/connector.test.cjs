@@ -112,7 +112,7 @@ test('native checklist hour annotations produce both total and remaining effort'
   }]})});
   const badges=await setup()['card-badges'](t);
   assert.ok(badges[0].text.includes('50% (1/2)'));
-  assert.equal(badges[1].text,'⏱ ≈ 5,5 h previstas · 2,5 h pendientes');
+  assert.equal(badges[1].text,'⏱ ≈ 5,5 h prev. · 2,5 h quedan');
 });
 test('stored estimate overrides a checklist annotation without losing remaining hours',async()=>{
   const t=client({card:async()=>({idList:TODO,desc:'',checklists:[{name:'Trabajo',checkItems:[
@@ -120,7 +120,7 @@ test('stored estimate overrides a checklist annotation without losing remaining 
     {id:'b',name:'Entregar · ≈ 2 h',state:'complete'}
   ]}]}),get:async()=>({a:4})});
   const badges=await setup()['card-badges'](t);
-  assert.equal(badges[1].text,'⏱ ≈ 6 h previstas · 4 h pendientes');
+  assert.equal(badges[1].text,'⏱ ≈ 6 h prev. · 4 h quedan');
 });
 test('uncosted milestones do not double-count work estimates',async()=>{
   const t=client({card:async()=>({idList:TODO,desc:'',checklists:[
@@ -129,7 +129,7 @@ test('uncosted milestones do not double-count work estimates',async()=>{
   ]})});
   const badges=await setup()['card-badges'](t);
   assert.ok(badges[0].text.includes('50% (1/2)'));
-  assert.equal(badges[1].text,'⏱ ≈ 5 h previstas · 5 h pendientes');
+  assert.equal(badges[1].text,'⏱ ≈ 5 h prev. · 5 h quedan');
 });
 test('v2 uppercase Trello headings preserve dependencies, time and summary',()=>{
   const w={};vm.runInNewContext(embedded,{window:w});
@@ -159,6 +159,26 @@ test('all supported entrypoints show planned and remaining effort, not the obsol
     ]}]};
     const badges=await capabilities['card-badges'](client({card:async()=>card}));
     assert.ok(badges[0].text.includes('50% (1/2)'),file);
-    assert.equal(badges[1].text,'⏱ ≈ 5,5 h previstas · 3,5 h pendientes',file);
+    assert.equal(badges[1].text,'⏱ ≈ 5,5 h prev. · 3,5 h quedan',file);
   }
+});
+
+test('badge uses readable description when Trello supplies progress but no checkItems',async()=>{
+ const desc='**VERTICAL SLICE — TIENDA**\nPrimera fase jugable.\n\n**ESTIMACIÓN DE TRABAJO**\nPrevisto: ≈14,5 h · Pendiente: ≈14,5 h\nReferencia: 0/7 criterios completos';
+ const t=client({card:async()=>({idList:TODO,desc,badges:{checkItems:7,checkItemsChecked:0},checklists:[]})});
+ const b=await setup()['card-badges'](t);
+ assert.match(b[0].text,/0%/);
+ assert.equal(b[1].text,'⏱ ≈ 14,5 h prev. · 14,5 h quedan');
+});
+test('stale description does not claim an accurate remaining estimate',async()=>{
+ const desc='**ESTIMACIÓN DE TRABAJO**\nPrevisto: ≈14,5 h · Pendiente: ≈14,5 h\nReferencia: 0/7 criterios completos';
+ const b=await setup()['card-badges'](client({card:async()=>({idList:TODO,desc,badges:{checkItems:7,checkItemsChecked:1},checklists:[]})}));
+ assert.equal(b[1].text,'⏱ ≈ 14,5 h prev. · revisar pendiente');
+});
+test('fresh stored snapshot replaces the description with current remaining hours',async()=>{
+ const desc='**ESTIMACIÓN DE TRABAJO**\nPrevisto: ≈14,5 h · Pendiente: ≈14,5 h\nReferencia: 0/7 criterios completos';
+ const t=client({card:async()=>({idList:TODO,desc,badges:{checkItems:7,checkItemsChecked:1},checklists:[]}),
+ get:async(model,visibility,key)=>key==='nothing_work_snapshot_v1'?{planned:14.5,remaining:12.5,done:1,total:7}:{}});
+ const b=await setup()['card-badges'](t);
+ assert.equal(b[1].text,'⏱ ≈ 14,5 h prev. · 12,5 h quedan');
 });
