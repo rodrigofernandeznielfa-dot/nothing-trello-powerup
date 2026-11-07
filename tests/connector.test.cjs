@@ -111,7 +111,7 @@ test('native checklist hour annotations produce both total and remaining effort'
     ]
   }]})});
   const badges=await setup()['card-badges'](t);
-  assert.match(badges[0].text,/50% \\(1\\/2\\)/);
+  assert.ok(badges[0].text.includes('50% (1/2)'));
   assert.equal(badges[1].text,'⏱ ≈ 5,5 h previstas · 2,5 h pendientes');
 });
 test('stored estimate overrides a checklist annotation without losing remaining hours',async()=>{
@@ -128,7 +128,7 @@ test('uncosted milestones do not double-count work estimates',async()=>{
     {name:'Trabajo',checkItems:[{id:'tarea',name:'Rediseño · ≈ 5 h',state:'incomplete'}]}
   ]})});
   const badges=await setup()['card-badges'](t);
-  assert.match(badges[0].text,/50% \\(1\\/2\\)/);
+  assert.ok(badges[0].text.includes('50% (1/2)'));
   assert.equal(badges[1].text,'⏱ ≈ 5 h previstas · 5 h pendientes');
 });
 test('v2 uppercase Trello headings preserve dependencies, time and summary',()=>{
