@@ -141,7 +141,7 @@ test('v2 uppercase Trello headings preserve dependencies, time and summary',()=>
 });
 
 test('all supported entrypoints show planned and remaining effort, not the obsolete time badge',async()=>{
-  for(const file of ['connector.html','connector-v17.html','index.html']){
+  for(const file of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
     const htmlText=fs.readFileSync(path.join(root,file),'utf8');
     const parts=Array.from(htmlText.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g));
     const helper=parts.find(part=>part[1].includes('nb-dependencies'));
@@ -181,4 +181,25 @@ test('fresh stored snapshot replaces the description with current remaining hour
  get:async(model,visibility,key)=>key==='nothing_work_snapshot_v1'?{planned:14.5,remaining:12.5,done:1,total:7}:{}});
  const b=await setup()['card-badges'](t);
  assert.equal(b[1].text,'⏱ ≈ 14,5 h prev. · 12,5 h quedan');
+});
+
+test('every historical connector shows estimated hours with only badge counts and description',async()=>{
+  const files=['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')];
+  const desc='**PRIMERA TIENDA**\nComercio jugable.\n\n**ESTIMACIÓN DE TRABAJO**\nPrevisto: ≈14,5 h · Pendiente: ≈14,5 h\nReferencia: 0/7 criterios completos\n\n**REFERENCIAS**\nGithub';
+  for(const file of files){
+    const htmlText=fs.readFileSync(path.join(root,file),'utf8');
+    const parts=Array.from(htmlText.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g));
+    const helper=parts.find(part=>part[1].includes('nb-dependencies'));
+    assert.ok(helper,file+' must include robust time helper');
+    const js=parts.filter(part=>!part[1].includes('nb-dependencies')).map(part=>part[2]).join('\n');
+    let capabilities;
+    const window={TrelloPowerUp:{initialize(data){capabilities=data}}};
+    const context=vm.createContext({window,Promise,setTimeout,clearTimeout,console:{warn(){},error(){}}});
+    vm.runInContext(helper[2],context);
+    vm.runInContext(js,context);
+    const badge=await capabilities['card-badges'](client({card:async()=>({
+      idList:TODO,desc,checklists:[],badges:{checkItems:7,checkItemsChecked:0}
+    })}));
+    assert.equal(badge[1].text,'⏱ ≈ 14,5 h prev. · 14,5 h quedan',file+' displayed '+badge[1]?.text);
+  }
 });
