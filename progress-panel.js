@@ -13,14 +13,25 @@ function historic(desc){
   return a===b?"≈ "+asHours(a):"≈ "+asHours(a)+"–"+asHours(b);
 }
 function setText(id,value){el(id).textContent=value}
-function extract(card,estimate){
-  const items=(card.checklists||[]).flatMap(c=>(c.checkItems||[]).map(i=>({id:i.id,name:i.name||"Criterio sin título",done:String(i.state).toLowerCase()==="complete"})));
-  const total=items.length||Number(card.badges?.checkItems)||0, completed=items.length?items.filter(i=>i.done).length:Number(card.badges?.checkItemsChecked)||0;
-  const pending=items.filter(i=>!i.done);
-  const allKnown=items.length>0 && pending.every(i=>typeof estimate[i.id]==="number"&&Number.isFinite(estimate[i.id])&&estimate[i.id]>=0);
-  const remaining=allKnown?pending.reduce((n,i)=>n+estimate[i.id],0):null;
-  const plan=window.NBDependencies.readTimePlan(card.checklists||[],estimate||{});
-  return {items,total,completed,remaining:plan?plan.remaining:remaining,plan,hasDetailedItems:items.length>0};
+function extract(card,estimate,cached){
+  const checklists=Array.isArray(card.checklists)?card.checklists:[];
+  const items=checklists.flatMap(c=>(Array.isArray(c.checkItems)?c.checkItems:[]).map(i=>({id:i.id,name:i.name||"Criterio sin título",done:String(i.state).toLowerCase()==="complete"})));
+  const native=card.badges||{},itemDone=items.filter(i=>i.done).length;
+  const nativeKnown=Number.isInteger(native.checkItems)&&Number.isInteger(native.checkItemsChecked)&&native.checkItems>=0&&native.checkItemsChecked>=0&&native.checkItemsChecked<=native.checkItems;
+  const total=nativeKnown?native.checkItems:items.length,completed=nativeKnown?native.checkItemsChecked:itemDone;
+  const detailedCurrent=items.length>0&&items.length===total&&itemDone===completed;
+  const live=detailedCurrent?window.NBDependencies.readTimePlan(checklists,estimate||{}):null;
+  const summary=window.NBDependencies.readTimeSummary(card.desc);
+  const valid=p=>p&&Number.isFinite(p.planned)&&Number.isFinite(p.remaining)&&p.planned>=p.remaining&&p.remaining>=0&&Number.isInteger(p.done)&&Number.isInteger(p.total)&&p.total>0&&p.done>=0&&p.done<=p.total;
+  const current=p=>valid(p)&&p.total===total&&p.done===completed;
+  let plan=live,source=live?"criteria":null,stale=false;
+  if(!plan){
+    if(current(cached)){plan=cached;source="snapshot"}
+    else if(current(summary)){plan=summary;source="summary"}
+    else if(valid(summary)||valid(cached)){plan=valid(summary)?summary:cached;source="stale";stale=true}
+  }
+  return {items,total,completed,remaining:plan&&!stale?plan.remaining:null,plan,source,stale,
+    live,hasDetailedItems:items.length>0};
 }
 function previewSummary(desc){
  const summary=window.NBDependencies.readPreview(desc);
@@ -111,8 +122,8 @@ function explicitNextDecision(desc){
  }
  return null;
 }
-function render(card,estimate,dependencies){
- const s=extract(card,estimate||{});
+function render(card,estimate,dependencies,cached){
+ const s=extract(card,estimate||{},cached);
  const finished=card.idList===DONE,progress=s.total?Math.round(s.completed*100/s.total):null;
  const blocked=!finished&&dependencies&&dependencies.blocked;
  setText("state",blocked?"Bloqueada":finished?"Hecho":card.idList===DOING?"En curso":card.idList===TODO?"Por hacer":"En seguimiento");
@@ -139,11 +150,13 @@ function render(card,estimate,dependencies){
  if(s.total){for(let i=0;i<Math.min(s.total,20);i++){const seg=document.createElement("span");seg.className="segment"+(i<Math.round((s.completed/s.total)*Math.min(s.total,20))?" done":"");bar.append(seg)}}
  const historical=historic(card.desc);
  setText("planned",s.plan?"≈ "+asHours(s.plan.planned):finished?"Sin estimación inicial":"Sin estimar");
- setText("plannedCaption",s.plan?"Estimación total de los criterios con horas":"No hay un plan de horas registrado");
- setText("spent",finished?historical||"Sin medir":"Sin registro");
- setText("spentCaption",historical&&finished?"Dedicación retrospectiva, no cronometrada":"No se ha medido tiempo real de trabajo");
- setText("remaining",finished?"0 h":s.remaining===null?"Sin estimar":"≈ "+asHours(s.remaining));
- setText("remainCaption",finished?"Tarjeta cerrada":s.remaining===null?"Faltan estimaciones por criterio":"Se descuentan las tareas marcadas como completadas");
+ setText("plannedCaption",s.plan?s.source==="summary"?"Estimación registrada en la tarjeta":s.source==="snapshot"?"Estimación guardada para este progreso":"Estimación total de los criterios con horas":"No hay un plan de horas registrado");
+ const completedEffort=s.plan&&!s.stale?Math.round((s.plan.planned-s.plan.remaining)*10)/10:null;
+ setText("spentLabel",historical?"Dedicación":"Completado");
+ setText("spent",historical||(completedEffort!==null?"≈ "+asHours(completedEffort):"Sin estimar"));
+ setText("spentCaption",historical?"Dedicación retrospectiva, no cronometrada":completedEffort!==null?"Esfuerzo estimado de las tareas completadas; no cronometrado":"Sin estimación verificable del trabajo completado");
+ setText("remaining",finished?"0 h":s.stale?"Revisar estimación":s.remaining===null?"Sin estimar":"≈ "+asHours(s.remaining));
+ setText("remainCaption",finished?"Tarjeta cerrada":s.stale?"El resumen no coincide con el progreso actual":s.remaining===null?"Faltan estimaciones por criterio":"Se descuentan las tareas marcadas como completadas");
  const list=el("steps");list.replaceChildren();
  if(s.hasDetailedItems){s.items.slice(0,12).forEach(item=>{
    const li=document.createElement("li"),mark=document.createElement("span"),text=document.createElement("span");
@@ -158,7 +171,8 @@ function render(card,estimate,dependencies){
  setText("next",finished?"Trabajo cerrado. Consulta la descripción y las evidencias de la tarjeta.":blocked?"Continuaremos cuando se complete la dependencia.":explicitNextDecision(card.desc)||(next?next.name:"Revisar la descripción de la tarjeta para elegir el siguiente paso."));
  const warnings=[];
  if(!finished&&s.total&&s.completed===s.total)warnings.push("Checklist completa, pero la tarjeta todavía no está cerrada.");
- if(!finished&&s.remaining===null)warnings.push("Tiempo restante sin calcular: añade horas aproximadas a las tareas de la checklist.");
+ if(!finished&&s.stale)warnings.push("Las horas registradas corresponden a otro progreso. Revisa el resumen de estimación o vuelve a abrir cuando Trello muestre el detalle de las casillas.");
+ else if(!finished&&s.remaining===null)warnings.push("Tiempo restante sin calcular: añade horas aproximadas a las tareas de la checklist.");
  const warning=el("warning");warning.replaceChildren();
  warnings.forEach(w=>{const p=document.createElement("p");p.className="notice small";p.textContent=w;warning.append(p)});
  el("status").hidden=true;el("content").hidden=false;
@@ -194,20 +208,18 @@ async function load(){
   }
   // In a card-detail iframe Trello normally supplies checkItems even when
   // card-badges on the board does not. Cache a verified snapshot for badges.
-  const items=(card.checklists||[]).flatMap(c=>c.checkItems||[]);
-  const live=items.length?window.NBDependencies.readTimePlan(card.checklists,estimate||{}):null;
-  const badges=card.badges||{};
+  const state=extract(card,estimate||{},cached);
+  const live=state.live;
   if(live){
     const current={
       planned:live.planned,remaining:live.remaining,
-      done:items.filter(i=>String(i.state).toLowerCase()==="complete").length,
-      total:items.length
+      done:state.completed,total:state.total
     };
     if(JSON.stringify(cached)!==JSON.stringify(current)){
       t.set("card","shared",SNAP,current).catch(err=>console.warn("NOTHING estimate cache",err));
     }
   }
-  render(card,estimate||{},dependencies);
+  render(card,estimate||{},dependencies,cached);
   loaded=true;window.clearTimeout(loadingTimeout);
  }catch(err){
   loaded=true;window.clearTimeout(loadingTimeout);

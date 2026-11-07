@@ -1,0 +1,103 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const root=path.join(__dirname,'..');
+const DOING='6aec66f02d325131dd44f8d8',DONE='6aec66f2b6df305a261abb0b';
+// Synthetic arithmetic fixture, not a copy of any private card description.
+const summary=(done=4)=>'**ESTIMACIÓN DE TRABAJO**\nPrevisto: ≈ 5 h · Pendiente: ≈ 1,5 h\nReferencia: '+done+'/5 criterios completos';
+class Element{
+  constructor(){this.textContent='';this.children=[];this.hidden=false;this.style={};this.classList={toggle(){}};}
+  replaceChildren(...children){this.children=children;}
+  append(...children){this.children.push(...children);}
+  addEventListener(){}
+  setAttribute(){}
+}
+async function panel(card,{estimate={},cached={},getFails=false,writeFails=false}={}){
+  const elements=new Map();
+  for(const id of fs.readFileSync(path.join(root,'progress-panel.html'),'utf8').matchAll(/id="([^"]+)"/g))elements.set(id[1],new Element());
+  elements.get('content').hidden=true;
+  const writes=[];
+  const client={card:async()=>card,cards:async()=>[],render(){},sizeTo:async()=>{},
+    get:async(model,visibility,key)=>{if(getFails)throw Error('unavailable');return key==='nothing_estimates_v1'?estimate:cached},
+    set:async(model,visibility,key,value)=>{if(writeFails)throw Error('readonly');writes.push({key,value})}};
+  const document={body:new Element(),getElementById:id=>{assert.ok(elements.has(id),'Missing element '+id);return elements.get(id)},createElement:()=>new Element(),createTextNode:text=>({textContent:text})};
+  const timers=new Set();
+  const window={TrelloPowerUp:{iframe:()=>client},setTimeout:(fn,ms)=>{const id=setTimeout(fn,ms);timers.add(id);return id},clearTimeout:id=>{clearTimeout(id);timers.delete(id)}};
+  const context=vm.createContext({window,document,console:{warn(){},error(){}}});
+  vm.runInContext(fs.readFileSync(path.join(root,'dependencies.js'),'utf8'),context);
+  vm.runInContext(fs.readFileSync(path.join(root,'progress-panel.js'),'utf8'),context);
+  try{
+    for(let i=0;i<50&&elements.get('content').hidden;i++)await new Promise(resolve=>setTimeout(resolve,2));
+    assert.equal(elements.get('content').hidden,false,'Panel did not finish rendering: '+elements.get('status').textContent);
+    return {text:id=>elements.get(id).textContent,node:id=>elements.get(id),writes};
+  }finally{for(const timer of timers)clearTimeout(timer)}
+}
+const card=(overrides={})=>({id:'synthetic',idList:DOING,desc:summary(),checklists:[],badges:{checkItems:5,checkItemsChecked:4},...overrides});
+test('card panel shows planned, remaining and completed effort without checkItems',async()=>{
+  const p=await panel(card());
+  assert.equal(p.text('percent'),'80%');
+  assert.equal(p.text('planned'),'≈ 5 h');
+  assert.equal(p.text('remaining'),'≈ 1,5 h');
+  assert.equal(p.text('spentLabel'),'Completado');
+  assert.equal(p.text('spent'),'≈ 3,5 h');
+  assert.match(p.text('spentCaption'),/estimado.*no cronometrado/);
+  assert.equal(p.writes.length,0,'Fallback must never overwrite per-item estimates or cache an unverified plan');
+});
+test('existing item estimates take priority over names, summary and stored snapshot',async()=>{
+  const p=await panel(card({badges:{checkItems:2,checkItemsChecked:1},checklists:[{checkItems:[
+    {id:'a',name:'Diseño · ≈ 2 h',state:'complete'},
+    {id:'b',name:'Revisión · ≈ 3 h',state:'incomplete'}]}]}),{estimate:{b:4},cached:{planned:99,remaining:90,done:1,total:2}});
+  assert.equal(p.text('planned'),'≈ 6 h');assert.equal(p.text('remaining'),'≈ 4 h');
+  assert.equal(p.text('spent'),'≈ 2 h');
+  assert.equal(p.writes.length,1);
+  assert.deepEqual(JSON.parse(JSON.stringify(p.writes[0].value)),{planned:6,remaining:4,done:1,total:2});
+});
+test('fresh saved plan is used when native details are absent',async()=>{
+  const p=await panel(card(),{cached:{planned:7,remaining:2,done:4,total:5}});
+  assert.equal(p.text('planned'),'≈ 7 h');assert.equal(p.text('remaining'),'≈ 2 h');assert.equal(p.text('spent'),'≈ 5 h');
+});
+test('changed progress never turns stale remaining hours into measured or proportional time',async()=>{
+  const p=await panel(card({badges:{checkItems:5,checkItemsChecked:3}}));
+  assert.equal(p.text('percent'),'60%');assert.equal(p.text('planned'),'≈ 5 h');
+  assert.equal(p.text('remaining'),'Revisar estimación');assert.equal(p.text('spent'),'Sin estimar');
+  assert.ok(p.node('warning').children.length>0);assert.equal(p.writes.length,0);
+});
+test('partial checklist response does not overwrite the full plan or native progress',async()=>{
+  const p=await panel(card({checklists:[{checkItems:[{id:'partial',name:'Parte · ≈ 1 h',state:'complete'}]}]}));
+  assert.equal(p.text('percent'),'80%');assert.equal(p.text('planned'),'≈ 5 h');
+  assert.equal(p.text('remaining'),'≈ 1,5 h');assert.equal(p.writes.length,0);
+});
+test('new estimate summary format also works without the Referencia prefix',async()=>{
+  const p=await panel(card({desc:summary().replace('Referencia: ', '')}));
+  assert.equal(p.text('planned'),'≈ 5 h');assert.equal(p.text('remaining'),'≈ 1,5 h');
+});
+test('unavailable shared plugin data does not hide description estimates',async()=>{
+  const p=await panel(card(),{getFails:true});
+  assert.equal(p.text('remaining'),'≈ 1,5 h');
+});
+test('invalid saved numeric values cannot replace a valid readable estimate',async()=>{
+  for(const cached of [{planned:Infinity,remaining:1,done:4,total:5},{planned:2,remaining:3,done:4,total:5},{planned:'5',remaining:1,done:4,total:5}]){
+    const p=await panel(card(),{cached});assert.equal(p.text('planned'),'≈ 5 h');assert.equal(p.text('remaining'),'≈ 1,5 h');
+  }
+});
+test('historical dedication stays labelled retrospective, never clocked',async()=>{
+  const p=await panel(card({idList:DONE,desc:'**DEDICACIÓN**\nAproximadamente 2 h, estimación retrospectiva.'}));
+  assert.equal(p.text('spentLabel'),'Dedicación');assert.equal(p.text('spent'),'≈ 2 h');
+  assert.match(p.text('spentCaption'),/retrospectiva, no cronometrada/);assert.equal(p.text('remaining'),'0 h');
+});
+test('no estimate remains unknown, rather than deriving time from percentage',async()=>{
+  const p=await panel(card({desc:''}));assert.equal(p.text('planned'),'Sin estimar');assert.equal(p.text('remaining'),'Sin estimar');assert.equal(p.text('spent'),'Sin estimar');
+});
+test('zero remaining/completed estimates are valid and readonly cache errors do not hide panel',async()=>{
+  const p=await panel(card({badges:{checkItems:1,checkItemsChecked:0},checklists:[{checkItems:[{id:'zero',name:'Prueba · ≈ 0 h',state:'incomplete'}]}]}),{writeFails:true});
+  assert.equal(p.text('planned'),'≈ 0 h');assert.equal(p.text('remaining'),'≈ 0 h');assert.equal(p.text('spent'),'≈ 0 h');
+});
+test('every supported connector reloads the corrected card panel',()=>{
+  const html=fs.readFileSync(path.join(root,'progress-panel.html'),'utf8');
+  assert.match(html,/progress-panel\.js\?v=14/);assert.match(html,/dependencies\.js\?v=4/);
+  for(const file of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
+    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=14/,file);
+  }
+});

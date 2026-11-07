@@ -16,7 +16,8 @@ Probar la tienda con el repartidor · ≈ 3,5 h
 - Las estimaciones son **esfuerzo activo**, no fechas ni tiempo de calendario; pueden revisarse conforme conocemos mejor el trabajo.
 - Los criterios sin horas (por ejemplo logros históricos o hitos de comprobación) **no suman horas**. Pueden seguir contando en el porcentaje general: progreso por checklist y esfuerzo estimado son métricas distintas.
 - El botón `NOTHING · Estimar criterios` continúa permitiendo editar horas por criterio. Sus datos guardados tienen prioridad frente a los valores escritos en el nombre.
-- `Invertido` solo muestra registro real cuando exista; las antiguas tarjetas HECHO conservan una aproximación **retrospectiva no cronometrada**, correctamente diferenciada.
+- `Completado` muestra el esfuerzo **estimado** de los criterios ya completados, calculado como previsto menos pendiente. No es un cronómetro ni convierte el porcentaje en horas. Si hay una dedicación histórica documentada, se muestra como `Dedicación`, retrospectiva y no cronometrada.
+- El panel interior utiliza el detalle actual de criterios y, si Trello no lo proporciona, un cálculo guardado compatible con el progreso o el resumen `ESTIMACIÓN DE TRABAJO` de la descripción. Un resumen desactualizado conserva el previsto, pero pide revisar el pendiente; nunca supone horas exactas a partir del porcentaje.
 - IDEAS sin alcance aprobado no reciben cifras de horas ficticias; las tareas POR HACER/EN CURSO sí se estiman.
 
 ## Desarrollo y seguridad
@@ -25,5 +26,5 @@ Probar la tienda con el repartidor · ≈ 3,5 h
 - `dependencies.js` define los lectores de encabezados Markdown y de horas. El conector incluye una copia embebida para evitar llamadas adicionales que puedan exceder el tiempo de respuesta de Trello.
 - `progress-panel.html` + `progress-panel.js`: panel por tarjeta, progreso y tres magnitudes de tiempo.
 - `estimate.html` + `estimate.js` + `core.js`: edición opcional del esfuerzo.
-- Ejecutar `node --test tests/connector.test.cjs`. La PR valida sin desplegar. El workflow GitHub Pages de main publica solo tras integrar cambios probados.
+- Ejecutar `node --test tests/*.test.cjs`. La PR valida sin desplegar. El workflow GitHub Pages de main publica solo tras integrar cambios probados y compara los archivos publicados con ese mismo commit.
 - El repositorio del Power-Up es público: **nunca** almacenar en él descripciones privadas de fichas, credenciales, secretos ni información interna del juego. Las estimaciones y decisiones concretas permanecen en Trello y documentación privada de NOTHING BITES.

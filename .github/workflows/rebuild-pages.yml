@@ -55,7 +55,7 @@ jobs:
           done
 
       - name: Test connector startup and failed Trello requests
-        run: node --test tests/connector.test.cjs
+        run: node --test tests/*.test.cjs
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
@@ -69,6 +69,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Checkout exact deployed revision for verification
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - name: Deploy Pages artifact
         id: deployment
         uses: actions/deploy-pages@v4
@@ -80,9 +85,22 @@ jobs:
         run: |
           set -euo pipefail
           base="${PAGES_URL%/}"
-          for file in connector.html connector-v13.html connector-v17.html progress-panel.html reference-catalog.js; do
+          for file in connector.html connector-v13.html connector-v17.html progress-panel.html progress-panel.js dependencies.js reference-catalog.js; do
             echo "Checking ${base}/${file}"
-            curl --fail --silent --show-error --location --retry 8 --retry-all-errors --retry-delay 8 --max-time 20 \
-              --output /dev/null "${base}/${file}"
+            target="$RUNNER_TEMP/nb-deployed-$file"
+            verified=false
+            for attempt in {1..8}; do
+              if curl --fail --silent --show-error --location --max-time 20 \
+                --output "$target" "${base}/${file}?nb_revision=${GITHUB_SHA}" && cmp -s "$file" "$target"; then
+                verified=true
+                break
+              fi
+              echo "Waiting for the current revision of $file (attempt $attempt)"
+              sleep 8
+            done
+            if [ "$verified" != true ]; then
+              echo "::error::Published $file does not match commit $GITHUB_SHA"
+              exit 1
+            fi
           done
-          echo "All required Power-Up URLs are available."
+          echo "All required Power-Up files match commit $GITHUB_SHA."
