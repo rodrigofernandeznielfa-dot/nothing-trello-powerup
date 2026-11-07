@@ -1,4 +1,4 @@
-import {ESTIMATE_KEY,itemsOf,summarize,validHours,hoursInName} from "./core.js";
+import {ESTIMATE_KEY,itemsOf,summarize,validHours,hoursInName} from "./core.js?v=2";
 const t=window.TrelloPowerUp.iframe();
 const box=document.getElementById("items");
 const error=document.getElementById("error");
