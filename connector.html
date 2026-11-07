@@ -33,7 +33,7 @@ function readDependencyIds(desc){
 function readHistoricHours(desc){
  const legacy=String(desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\d+(?:\.\d+)?) max=(\d+(?:\.\d+)?)/);
  const section=readSection(desc,"Dedicación")||readSection(desc,"Histórico de dedicación");
- const readable=section.match(/^Aproximadamente (\d+(?:[.,]\d+)?)(?:[–-](\d+(?:[.,]\d+)?))? h\./i);
+ const readable=section.match(/^Aproximadamente\s+(\d+(?:[.,]\d+)?)(?:[–-](\d+(?:[.,]\d+)?))?\s+h(?=\s*[,.;]|\s*$)/i);
  const m=legacy||readable;
  if(!m)return null;
  const min=Number(m[1].replace(",",".")),max=Number((m[2]||m[1]).replace(",","."));
