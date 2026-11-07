@@ -33,7 +33,7 @@ function readDependencyIds(desc){
 function readHistoricHours(desc){
  const legacy=String(desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\d+(?:\.\d+)?) max=(\d+(?:\.\d+)?)/);
  const section=readSection(desc,"Dedicación")||readSection(desc,"Histórico de dedicación");
- const readable=section.match(/^Aproximadamente (\d+(?:[.,]\d+)?)(?:[–-](\d+(?:[.,]\d+)?))? h\./i);
+ const readable=section.match(/^Aproximadamente\s+(\d+(?:[.,]\d+)?)(?:[–-](\d+(?:[.,]\d+)?))?\s+h(?=\s*[,.;]|\s*$)/i);
  const m=legacy||readable;
  if(!m)return null;
  const min=Number(m[1].replace(",",".")),max=Number((m[2]||m[1]).replace(",","."));
@@ -145,7 +145,8 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
     var historic=dependencyReader?dependencyReader.readHistoricHours(card.desc):null;
     var historicText=historic?(historic.min===historic.max?"≈ "+historic.min+" h":"≈ "+historic.min+"–"+historic.max+" h"):null;
     if(!items.length && !nativeTotal){
-      var onlyTime=card.idList===DONE && historicText?[{text:historicText,color:"light-gray"}]:[];
+      var onlyTime=card.idList===DONE && historic?
+        [{text:"⏱ "+String(historic.min).replace(".",",")+(historic.max!==historic.min?"–"+String(historic.max).replace(".",","):"")+" h",color:"light-gray"}]:[];
       return blockedBadge?[blockedBadge].concat(onlyTime):onlyTime;
     }
     var plan=dependencyReader?dependencyReader.readTimePlan(card.checklists||[],estimates):null;
@@ -170,16 +171,18 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
     var known=!usingNative && pending.every(function(x){return typeof estimates[x.id]==="number" && Number.isFinite(estimates[x.id]) && estimates[x.id]>=0});
     var hours=known?pending.reduce(function(sum,x){return sum+estimates[x.id]},0):null;
     var percent=Math.round(done*100/total),filled=Math.round(percent/20);
+    // Completed cards show only their retrospective work estimate.
+    // No redundant "0 h pendientes" or "sin medir" on the board.
     var timeText=card.idList===DONE
-      ?(historicText?historicText+" dedicadas · 0 h pendientes":"0 h pendientes · dedicación sin medir")
+      ?(historic? "⏱ "+fmtHour(historic.min)+(historic.max!==historic.min?"–"+fmtHour(historic.max):"")+" h":null)
       :(effective?(stale
        ?"⏱ ≈ "+fmtHour(effective.planned)+" h prev. · revisar pendiente"
        :"⏱ ≈ "+fmtHour(effective.planned)+" h prev. · "+fmtHour(effective.remaining)+" h quedan")
        :hours===null?"⏱ Sin estimar":"⏱ "+Math.round(hours*10)/10+" h pendientes");
     var badges=[
-      {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")",color:percent===100?"green":"blue"},
-      {text:timeText,color:"light-gray"}
+      {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")",color:percent===100?"green":"blue"}
     ];
+    if(timeText)badges.push({text:timeText,color:"light-gray"});
     return blockedBadge?[blockedBadge].concat(badges):badges;
   }
   window.TrelloPowerUp.initialize({
