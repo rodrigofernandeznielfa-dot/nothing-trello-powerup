@@ -139,3 +139,26 @@ test('v2 uppercase Trello headings preserve dependencies, time and summary',()=>
   assert.deepEqual(plain(h.readHistoricHours(desc)),{min:1.5,max:1.5});
   assert.equal(h.readPreview(desc),'Resumen visual.');
 });
+
+test('all supported entrypoints show planned and remaining effort, not the obsolete time badge',async()=>{
+  for(const file of ['connector.html','connector-v17.html','index.html']){
+    const htmlText=fs.readFileSync(path.join(root,file),'utf8');
+    const parts=Array.from(htmlText.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g));
+    const helper=parts.find(part=>part[1].includes('nb-dependencies'));
+    assert.ok(helper,file+' has embedded estimate helper');
+    assert.equal(helper[2].trim(),fs.readFileSync(path.join(root,'dependencies.js'),'utf8').trim());
+    const js=parts.filter(part=>!part[1].includes('nb-dependencies')).map(part=>part[2]).join('\n');
+    let capabilities;
+    const window={TrelloPowerUp:{initialize(data){capabilities=data}}};
+    const context=vm.createContext({window,Promise,setTimeout,clearTimeout,console:{warn(){},error(){}}});
+    vm.runInContext(helper[2],context);
+    vm.runInContext(js,context);
+    const card={idList:TODO,desc:'',checklists:[{name:'Trabajo',checkItems:[
+      {id:'a',name:'Maqueta · ≈ 2 h',state:'complete'},
+      {id:'b',name:'Pruebas · ≈ 3,5 h',state:'incomplete'}
+    ]}]};
+    const badges=await capabilities['card-badges'](client({card:async()=>card}));
+    assert.ok(badges[0].text.includes('50% (1/2)'),file);
+    assert.equal(badges[1].text,'⏱ ≈ 5,5 h previstas · 3,5 h pendientes',file);
+  }
+});
