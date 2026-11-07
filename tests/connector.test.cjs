@@ -64,7 +64,7 @@ test('known unfinished dependency remains blocked',async()=>{
 test('finished cards retain historical hours; ideas retain no badges',async()=>{
   const c=setup();
   const done=await c['card-badges'](client({card:async()=>({idList:DONE,desc:'NB_TIME_HISTORIC_ESTIMATE_V1 min=2 max=2',badges:{checkItems:5,checkItemsChecked:5}})}));
-  assert.match(done[0].text,/100% \(5\/5\)/);assert.equal(done[1].text,'≈ 2 h dedicadas · 0 h pendientes');
+  assert.match(done[0].text,/100% \(5\/5\)/);assert.equal(done[1].text,'⏱ 2 h');
   const ideas=await c['card-badges'](client({card:async()=>({idList:'6aec66eb5ff8ae196d37b7ca'})}));
   assert.deepEqual(plain(ideas),[]);
 });
@@ -93,7 +93,7 @@ test('readable dependency links preserve blocked state',async()=>{
 });
 test('readable retrospective hours preserve the historical badge',async()=>{
   const b=await setup()['card-badges'](client({card:async()=>({idList:DONE,desc:'**Resultado verificado**\nDone\n\n**Histórico de dedicación**\nAproximadamente 1,5 h. Estimación retrospectiva, no cronometrada.',badges:{checkItems:5,checkItemsChecked:5}})}));
-  assert.equal(b[1].text,'≈ 1.5 h dedicadas · 0 h pendientes');
+  assert.equal(b[1].text,'⏱ 1,5 h');
 });
 test('helper reads human summaries, decimal ranges and only actual dependency sections',()=>{
   const window={};vm.runInNewContext(embedded,{window});
@@ -201,5 +201,41 @@ test('every historical connector shows estimated hours with only badge counts an
       idList:TODO,desc,checklists:[],badges:{checkItems:7,checkItemsChecked:0}
     })}));
     assert.equal(badge[1].text,'⏱ ≈ 14,5 h prev. · 14,5 h quedan',file+' displayed '+badge[1]?.text);
+    const finished=await capabilities['card-badges'](client({card:async()=>({
+      idList:DONE,desc:'**DEDICACIÓN**\nAproximadamente 2 h, estimación retrospectiva.',
+      checklists:[],badges:{checkItems:5,checkItemsChecked:5}
+    })}));
+    assert.equal(finished[1]?.text,'⏱ 2 h',file+' must show clean completed effort');
+    assert.equal(finished.length,2,file+' must not add a redundant zero-hour badge');
   }
+});
+
+test('completed cards use one compact historical-time badge with no zero-hour label',async()=>{
+  const c=setup();
+  for(const [minutes,text] of [['0,5','⏱ 0,5 h'],['1','⏱ 1 h'],['2','⏱ 2 h'],['4,5','⏱ 4,5 h']]){
+    const desc='**TRABAJO TERMINADO**\nSe ha verificado en Godot.\n\n**DEDICACIÓN**\nAproximadamente '+minutes+' h, estimación retrospectiva.';
+    const badges=await c['card-badges'](client({card:async()=>({
+      idList:DONE,desc,badges:{checkItems:5,checkItemsChecked:5},checklists:[]
+    })}));
+    assert.equal(badges.length,2);
+    assert.match(badges[0].text,/100% \(5\/5\)/);
+    assert.equal(badges[1].text,text);
+    assert.ok(!badges.some(b=>/0 h pendientes|sin medir|aproximad/i.test(b.text)));
+  }
+});
+test('completed cards with no historical estimate do not render a time badge',async()=>{
+  const c=setup();
+  const badges=await c['card-badges'](client({card:async()=>({
+    idList:DONE,desc:'**TRABAJO HECHO**\nSin registro de tiempo.',
+    badges:{checkItems:5,checkItemsChecked:5},checklists:[]
+  })}));
+  assert.equal(badges.length,1);
+  assert.match(badges[0].text,/100%/);
+});
+test('completed cards without checklists keep the historic-only badge if recorded',async()=>{
+  const c=setup();
+  const badges=await c['card-badges'](client({card:async()=>({
+    idList:DONE,desc:'**DEDICACIÓN**\nAproximadamente 1,5 h, estimación retrospectiva.',badges:{checkItems:0}
+  })}));
+  assert.deepEqual(plain(badges),[{text:'⏱ 1,5 h',color:'light-gray'}]);
 });
