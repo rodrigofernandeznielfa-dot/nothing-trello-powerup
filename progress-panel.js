@@ -3,6 +3,7 @@
 const t=window.TrelloPowerUp.iframe();
 const DONE="6aec66f2b6df305a261abb0b",TODO="6aec66ed3137d17f84ce7a3c",DOING="6aec66f02d325131dd44f8d8";
 const KEY="nothing_estimates_v1";
+const SNAP="nothing_work_snapshot_v1";
 const el=id=>document.getElementById(id);
 function asHours(n){return Number.isFinite(n)?String(Math.round(n*10)/10).replace(".",",")+" h":"—"}
 function historic(desc){
@@ -178,7 +179,11 @@ const loadingTimeout=window.setTimeout(function(){
 },9000);
 async function load(){
  try{
-  const [card,estimate]=await Promise.all([t.card("id","idList","desc","checklists","badges"),t.get("card","shared",KEY,{}).catch(()=>({}))]);
+  const [card,estimate,cached]=await Promise.all([
+    t.card("id","idList","desc","checklists","badges"),
+    t.get("card","shared",KEY,{}).catch(()=>({})),
+    t.get("card","shared",SNAP,{}).catch(()=>({}))
+  ]);
   let dependencies={blocked:false,dependencies:[],missing:[]};
   if(card.idList!==DONE && window.NBDependencies.readDependencyIds(card.desc).length){
     try{
@@ -186,6 +191,21 @@ async function load(){
       dependencies=window.NBDependencies.resolve(card.desc,cards,DONE);
       dependencies.dependencies.forEach(dep=>{const source=cards.find(c=>c.shortLink===dep.id);if(source){dep.desc=source.desc;dep.idList=source.idList}});
     }catch(error){console.warn("NOTHING dependency lookup failed",error)}
+  }
+  // In a card-detail iframe Trello normally supplies checkItems even when
+  // card-badges on the board does not. Cache a verified snapshot for badges.
+  const items=(card.checklists||[]).flatMap(c=>c.checkItems||[]);
+  const live=items.length?window.NBDependencies.readTimePlan(card.checklists,estimate||{}):null;
+  const badges=card.badges||{};
+  if(live){
+    const current={
+      planned:live.planned,remaining:live.remaining,
+      done:items.filter(i=>String(i.state).toLowerCase()==="complete").length,
+      total:items.length
+    };
+    if(JSON.stringify(cached)!==JSON.stringify(current)){
+      t.set("card","shared",SNAP,current).catch(err=>console.warn("NOTHING estimate cache",err));
+    }
   }
   render(card,estimate||{},dependencies);
   loaded=true;window.clearTimeout(loadingTimeout);
