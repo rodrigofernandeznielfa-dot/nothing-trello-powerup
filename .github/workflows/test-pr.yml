@@ -25,3 +25,18 @@ jobs:
           for f in *.js; do node --input-type=module --check < "$f"; done
       - name: Test Power-Up and embedded connector
         run: node --test tests/*.test.cjs
+      - name: Install browser test driver outside the published source
+        run: npm install --prefix "$RUNNER_TEMP/nb-browser" --no-save --package-lock=false --ignore-scripts playwright@1.62.1
+      - name: Render partial effort case in installed Chrome
+        env:
+          NODE_PATH: ${{ runner.temp }}/nb-browser/node_modules
+          NB_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/nb-panel-evidence
+        run: node tests/browser-panel.cjs
+      - name: Preserve rendered regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: panel-partial-effort
+          path: ${{ runner.temp }}/nb-panel-evidence/*.png
+          if-no-files-found: warn
+          retention-days: 14

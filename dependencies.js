@@ -55,21 +55,22 @@ function readTimePlan(checklists,estimates){
    (Array.isArray(c.checkItems)?c.checkItems:[]).map(item=>({id:item.id,name:item.name,
      done:String(item.state).toLowerCase()==="complete"}))
  );
- let planned=0,remaining=0,estimatedCount=0;
+ let planned=0,remaining=0,estimatedCount=0,estimatedCompletedCount=0,unestimatedCompletedCount=0;
  for(const item of items){
   // Existing Power-Up values take precedence. We never overwrite saved edits.
   const explicit=manual[item.id];
   const hours=typeof explicit==="number"&&Number.isFinite(explicit)&&explicit>=0&&explicit<=999
     ?explicit:readCriterionHours(item.name);
-  if(hours===null)continue;
+  if(hours===null){if(item.done)unestimatedCompletedCount++;continue}
   estimatedCount++;
   planned+=hours;
   if(!item.done)remaining+=hours;
+  else estimatedCompletedCount++;
  }
  if(!estimatedCount)return null;
  const rounded=x=>Math.round(x*10)/10;
  return {planned:rounded(planned),remaining:rounded(remaining),estimatedCount,totalItems:items.length,
-   completedEffort:rounded(planned-remaining)};
+   completedEffort:rounded(planned-remaining),estimatedCompletedCount,unestimatedCompletedCount};
 }
 // Human-readable summary stored in the card description as a fallback for
 // Trello's card-badges context, where checkItems may not be provided.
@@ -77,12 +78,20 @@ function readTimeSummary(desc){
  const section=readSection(desc,"ESTIMACIÓN DE TRABAJO");
  if(!section)return null;
  const match=section.match(/Previsto:\s*≈?\s*(\d+(?:[.,]\d+)?)\s*h\s*[·|/]\s*Pendiente:\s*≈?\s*(\d+(?:[.,]\d+)?)\s*h/i);
+ const pendingOnly=section.match(/^Pendiente:\s*≈?\s*(\d+(?:[.,]\d+)?)\s*h\s*$/im);
  const progress=section.match(/(?:Referencia:\s*)?(\d+)\s*\/\s*(\d+)\s*criterios/i);
- if(!match||!progress)return null;
- const planned=Number(match[1].replace(",",".")),remaining=Number(match[2].replace(",","."));
+ if((!match&&!pendingOnly)||!progress)return null;
+ const planned=Number((match?match[1]:pendingOnly[1]).replace(",",".")),remaining=Number((match?match[2]:pendingOnly[1]).replace(",","."));
  const done=Number(progress[1]),total=Number(progress[2]);
  if(![planned,remaining,done,total].every(Number.isFinite) || planned<0 || remaining<0 || remaining>planned || done<0 || total<1 || done>total)return null;
- return {planned,remaining,done,total};
+ return match?{planned,remaining,done,total}:{planned,remaining,done,total,unestimatedCompletedCount:done,estimatedCompletedCount:0};
+}
+function hasUnestimatedCompleted(plan,done){
+ if(!plan)return false;
+ if(Number.isInteger(plan.unestimatedCompletedCount))return plan.unestimatedCompletedCount>0;
+ // Older summaries/cache only contain the future-work subtotal. Zero difference
+ // cannot prove zero effort for already-completed criteria without cost coverage.
+ return done>0&&plan.planned===plan.remaining&&plan.estimatedCompletedCount!==done;
 }
 function resolve(desc,cards,doneListId){
  const ids=readDependencyIds(desc);
@@ -96,5 +105,5 @@ function resolve(desc,cards,doneListId){
  }
  return {blocked:unresolved.length>0,dependencies:unresolved,missing};
 }
-root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan,readTimeSummary};
+root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan,readTimeSummary,hasUnestimatedCompleted};
 })(typeof window!=="undefined"?window:globalThis);
