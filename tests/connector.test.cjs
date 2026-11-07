@@ -129,7 +129,7 @@ test('uncosted milestones do not double-count work estimates',async()=>{
   ]})});
   const badges=await setup()['card-badges'](t);
   assert.ok(badges[0].text.includes('50% (1/2)'));
-  assert.equal(badges[1].text,'⏱ ≈ 5 h prev. · 5 h quedan');
+  assert.equal(badges[1].text,'⏱ ≈ 5 h quedan · total sin cerrar');
 });
 test('v2 uppercase Trello headings preserve dependencies, time and summary',()=>{
   const w={};vm.runInNewContext(embedded,{window:w});

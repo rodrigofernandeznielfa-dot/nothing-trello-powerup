@@ -52,7 +52,7 @@ test('existing item estimates take priority over names, summary and stored snaps
   assert.equal(p.text('planned'),'≈ 6 h');assert.equal(p.text('remaining'),'≈ 4 h');
   assert.equal(p.text('spent'),'≈ 2 h');
   assert.equal(p.writes.length,1);
-  assert.deepEqual(JSON.parse(JSON.stringify(p.writes[0].value)),{planned:6,remaining:4,done:1,total:2});
+  assert.deepEqual(JSON.parse(JSON.stringify(p.writes[0].value)),{planned:6,remaining:4,done:1,total:2,estimatedCompletedCount:1,unestimatedCompletedCount:0});
 });
 test('fresh saved plan is used when native details are absent',async()=>{
   const p=await panel(card(),{cached:{planned:7,remaining:2,done:4,total:5}});
@@ -96,8 +96,36 @@ test('zero remaining/completed estimates are valid and readonly cache errors do 
 });
 test('every supported connector reloads the corrected card panel',()=>{
   const html=fs.readFileSync(path.join(root,'progress-panel.html'),'utf8');
-  assert.match(html,/progress-panel\.js\?v=14/);assert.match(html,/dependencies\.js\?v=4/);
+  assert.match(html,/progress-panel\.js\?v=15/);assert.match(html,/dependencies\.js\?v=5/);
   for(const file of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
-    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=14/,file);
+    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=15/,file);
   }
+});
+
+const partialCard=require('./fixtures/partial-effort.cjs');
+test('9/36 case: 34.5 future hours are not the whole-project budget and unestimated past is not zero',async()=>{
+ for(const details of [true,false]){
+  const fixture=partialCard();if(!details)fixture.checklists=[];
+  const p=await panel(fixture);
+  assert.equal(p.text('percent'),'25%');assert.equal(p.text('remaining'),'≈ 34,5 h');
+  assert.equal(p.text('planned'),'Sin cerrar');assert.equal(p.text('spent'),'Sin estimar');
+  assert.match(p.text('spentCaption'),/previos.*no tienen horas/);
+ }
+});
+test('completing a 2-hour task reduces real remaining effort by two, not a percentage of achievements',async()=>{
+ const fixture=partialCard();fixture.checklists[1].checkItems[0].state='complete';fixture.badges.checkItemsChecked=10;
+ const p=await panel(fixture);
+ assert.equal(p.text('percent'),'28%');assert.equal(p.text('remaining'),'≈ 32,5 h');
+ assert.equal(p.text('planned'),'Sin cerrar');assert.equal(p.text('spent'),'≈ 2 h');
+ assert.match(p.text('spentCaption'),/avances previos sin estimar/);
+});
+test('legacy cache without coverage never implies zero hours for nine completed achievements',async()=>{
+ const fixture=partialCard();fixture.checklists=[];fixture.desc=summary(9).replace('5 h','34,5 h').replace('1,5 h','34,5 h').replace('9/5','9/36');
+ const p=await panel(fixture,{cached:{planned:34.5,remaining:34.5,done:9,total:36}});
+ assert.equal(p.text('planned'),'Sin cerrar');assert.equal(p.text('spent'),'Sin estimar');
+ assert.equal(p.text('remaining'),'≈ 34,5 h');
+});
+test('explicitly estimated zero-hour completed work stays zero, rather than being treated as missing',async()=>{
+ const p=await panel(card({desc:'',badges:{checkItems:1,checkItemsChecked:1},checklists:[{checkItems:[{id:'zero',name:'Sin esfuerzo · ≈ 0 h',state:'complete'}]}]}));
+ assert.equal(p.text('planned'),'≈ 0 h');assert.equal(p.text('spent'),'≈ 0 h');
 });
