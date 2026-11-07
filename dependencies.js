@@ -1,8 +1,14 @@
 (function(root){
 "use strict";
+function headingKey(value){
+ return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase();
+}
 function readSection(desc,heading){
  const lines=String(desc||"").replace(/\r/g,"").split("\n");
- const start=lines.findIndex(line=>line.trim()==="**"+heading+"**");
+ const start=lines.findIndex(line=>{
+  const found=line.trim().match(/^\*\*([^*]+)\*\*$/);
+  return found && headingKey(found[1])===headingKey(heading);
+ });
  if(start<0)return "";
  const result=[];
  for(const line of lines.slice(start+1)){
@@ -12,34 +18,70 @@ function readSection(desc,heading){
  return result.join("\n").trim();
 }
 function readDependencyIds(desc){
- const line=String(desc||"").match(/^NB_DEPENDENCIES_V1:\s*([A-Za-z0-9,\s-]+)$/m);
- const ids=line?line[1].split(",").map(x=>x.trim())
+ const legacy=String(desc||"").match(/^NB_DEPENDENCIES_V1:\s*([A-Za-z0-9,\s-]+)$/m);
+ const ids=legacy?legacy[1].split(",").map(x=>x.trim())
   :Array.from(readSection(desc,"Depende de").matchAll(/https:\/\/trello\.com\/c\/([A-Za-z0-9]{8})(?=[/)\s]|$)/g),m=>m[1]);
  return [...new Set(ids.filter(x=>/^[A-Za-z0-9]{8}$/.test(x)))].slice(0,12);
 }
 function readHistoricHours(desc){
- const old=String(desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\d+(?:\.\d+)?) max=(\d+(?:\.\d+)?)/);
- const readable=readSection(desc,"Histórico de dedicación").match(/^Aproximadamente (\d+(?:[.,]\d+)?)(?:[–-](\d+(?:[.,]\d+)?))? h\./);
- const match=old||readable;
- if(!match)return null;
- const min=Number(match[1].replace(",",".")),max=Number((match[2]||match[1]).replace(",","."));
+ const legacy=String(desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\d+(?:\.\d+)?) max=(\d+(?:\.\d+)?)/);
+ const section=readSection(desc,"Dedicación")||readSection(desc,"Histórico de dedicación");
+ const readable=section.match(/^Aproximadamente (\d+(?:[.,]\d+)?)(?:[–-](\d+(?:[.,]\d+)?))? h\./i);
+ const m=legacy||readable;
+ if(!m)return null;
+ const min=Number(m[1].replace(",",".")),max=Number((m[2]||m[1]).replace(",","."));
  return Number.isFinite(min)&&Number.isFinite(max)&&min>=0&&max>=min?{min,max}:null;
 }
 function readPreview(desc){
  const old=String(desc||"").match(/^NB_PREVIEW_V1:\s*(.+)$/m);
- return old?old[1]:readSection(desc,"Resumen");
+ if(old)return old[1];
+ const section=readSection(desc,"Resumen");
+ if(section)return section.split(/\n\s*\n/)[0].trim();
+ const parts=String(desc||"").replace(/\r/g,"").split("\n");
+ if(/^\*\*[^*]+\*\*$/.test((parts[0]||"").trim()))return (parts[1]||"").trim();
+ return "";
+}
+function readCriterionHours(name){
+ // Editable, visible work estimate on a native Trello check item:
+ // "Revisar el diseño · ≈ 2,5 h". No other numbers are treated as hours.
+ const m=String(name||"").match(/\s[·•]\s≈\s*(\d+(?:[.,]\d+)?)\s*h\s*$/i);
+ if(!m)return null;
+ const h=Number(m[1].replace(",","."));
+ return Number.isFinite(h)&&h>=0&&h<=999?h:null;
+}
+function readTimePlan(checklists,estimates){
+ const manual=estimates&&typeof estimates==="object"&&!Array.isArray(estimates)?estimates:{};
+ const items=(Array.isArray(checklists)?checklists:[]).flatMap(c=>
+   (Array.isArray(c.checkItems)?c.checkItems:[]).map(item=>({id:item.id,name:item.name,
+     done:String(item.state).toLowerCase()==="complete"}))
+ );
+ let planned=0,remaining=0,estimatedCount=0;
+ for(const item of items){
+  // Existing Power-Up values take precedence. We never overwrite saved edits.
+  const explicit=manual[item.id];
+  const hours=typeof explicit==="number"&&Number.isFinite(explicit)&&explicit>=0&&explicit<=999
+    ?explicit:readCriterionHours(item.name);
+  if(hours===null)continue;
+  estimatedCount++;
+  planned+=hours;
+  if(!item.done)remaining+=hours;
+ }
+ if(!estimatedCount)return null;
+ const rounded=x=>Math.round(x*10)/10;
+ return {planned:rounded(planned),remaining:rounded(remaining),estimatedCount,totalItems:items.length,
+   completedEffort:rounded(planned-remaining)};
 }
 function resolve(desc,cards,doneListId){
- const dependencyIds=readDependencyIds(desc);
- if(!dependencyIds.length)return {blocked:false,dependencies:[],missing:[]};
+ const ids=readDependencyIds(desc);
+ if(!ids.length)return {blocked:false,dependencies:[],missing:[]};
  const mapped=new Map((Array.isArray(cards)?cards:[]).filter(Boolean).map(card=>[card.shortLink,card]));
  const unresolved=[],missing=[];
- for(const id of dependencyIds){
+ for(const id of ids){
   const card=mapped.get(id);
   if(!card){missing.push(id);continue}
   if(card.idList!==doneListId)unresolved.push({id,name:card.name||"Tarjeta "+id,url:"https://trello.com/c/"+id});
  }
- return {blocked:unresolved.length>0,dependencies:unresolved,missing:missing};
+ return {blocked:unresolved.length>0,dependencies:unresolved,missing};
 }
-root.NBDependencies={readDependencyIds,resolve,readHistoricHours,readPreview};
+root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan};
 })(typeof window!=="undefined"?window:globalThis);
