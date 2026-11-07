@@ -71,6 +71,19 @@ function readTimePlan(checklists,estimates){
  return {planned:rounded(planned),remaining:rounded(remaining),estimatedCount,totalItems:items.length,
    completedEffort:rounded(planned-remaining)};
 }
+// Human-readable summary stored in the card description as a fallback for
+// Trello's card-badges context, where checkItems may not be provided.
+function readTimeSummary(desc){
+ const section=readSection(desc,"ESTIMACIÓN DE TRABAJO");
+ if(!section)return null;
+ const match=section.match(/Previsto:\s*≈?\s*(\d+(?:[.,]\d+)?)\s*h\s*[·|/]\s*Pendiente:\s*≈?\s*(\d+(?:[.,]\d+)?)\s*h/i);
+ const progress=section.match(/Referencia:\s*(\d+)\s*\/\s*(\d+)\s*criterios/i);
+ if(!match||!progress)return null;
+ const planned=Number(match[1].replace(",",".")),remaining=Number(match[2].replace(",","."));
+ const done=Number(progress[1]),total=Number(progress[2]);
+ if(![planned,remaining,done,total].every(Number.isFinite) || planned<0 || remaining<0 || remaining>planned || done<0 || total<1 || done>total)return null;
+ return {planned,remaining,done,total};
+}
 function resolve(desc,cards,doneListId){
  const ids=readDependencyIds(desc);
  if(!ids.length)return {blocked:false,dependencies:[],missing:[]};
@@ -83,5 +96,5 @@ function resolve(desc,cards,doneListId){
  }
  return {blocked:unresolved.length>0,dependencies:unresolved,missing};
 }
-root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan};
+root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan,readTimeSummary};
 })(typeof window!=="undefined"?window:globalThis);
