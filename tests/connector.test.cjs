@@ -64,7 +64,7 @@ test('known unfinished dependency remains blocked',async()=>{
 test('finished cards retain historical hours; ideas retain no badges',async()=>{
   const c=setup();
   const done=await c['card-badges'](client({card:async()=>({idList:DONE,desc:'NB_TIME_HISTORIC_ESTIMATE_V1 min=2 max=2',badges:{checkItems:5,checkItemsChecked:5}})}));
-  assert.match(done[0].text,/100% \(5\/5\)/);assert.equal(done[1].text,'≈ 2 h');
+  assert.match(done[0].text,/100% \(5\/5\)/);assert.equal(done[1].text,'≈ 2 h dedicadas · 0 h pendientes');
   const ideas=await c['card-badges'](client({card:async()=>({idList:'6aec66eb5ff8ae196d37b7ca'})}));
   assert.deepEqual(plain(ideas),[]);
 });
@@ -93,7 +93,7 @@ test('readable dependency links preserve blocked state',async()=>{
 });
 test('readable retrospective hours preserve the historical badge',async()=>{
   const b=await setup()['card-badges'](client({card:async()=>({idList:DONE,desc:'**Resultado verificado**\nDone\n\n**Histórico de dedicación**\nAproximadamente 1,5 h. Estimación retrospectiva, no cronometrada.',badges:{checkItems:5,checkItemsChecked:5}})}));
-  assert.equal(b[1].text,'≈ 1.5 h');
+  assert.equal(b[1].text,'≈ 1.5 h dedicadas · 0 h pendientes');
 });
 test('helper reads human summaries, decimal ranges and only actual dependency sections',()=>{
   const window={};vm.runInNewContext(embedded,{window});
@@ -101,4 +101,41 @@ test('helper reads human summaries, decimal ranges and only actual dependency se
   assert.equal(h.readPreview('**Resumen**\nShort summary.\n\n**Objetivo**\nLong objective.'),'Short summary.');
   assert.deepEqual(plain(h.readHistoricHours('**Histórico de dedicación**\nAproximadamente 1,5–2,5 h. Not measured.')),{min:1.5,max:2.5});
   assert.deepEqual(plain(h.readDependencyIds('**Objetivo**\nSee https://trello.com/c/CPRnmJFc')),[]);
+});
+
+test('native checklist hour annotations produce both total and remaining effort',async()=>{
+  const t=client({card:async()=>({idList:TODO,desc:'',checklists:[{
+    name:'Trabajo',checkItems:[
+      {id:'a',name:'Diseño · ≈ 3 h',state:'complete'},
+      {id:'b',name:'Pruebas · ≈ 2,5 h',state:'incomplete'}
+    ]
+  }]})});
+  const badges=await setup()['card-badges'](t);
+  assert.match(badges[0].text,/50% \\(1\\/2\\)/);
+  assert.equal(badges[1].text,'⏱ ≈ 5,5 h previstas · 2,5 h pendientes');
+});
+test('stored estimate overrides a checklist annotation without losing remaining hours',async()=>{
+  const t=client({card:async()=>({idList:TODO,desc:'',checklists:[{name:'Trabajo',checkItems:[
+    {id:'a',name:'Revisar · ≈ 3 h',state:'incomplete'},
+    {id:'b',name:'Entregar · ≈ 2 h',state:'complete'}
+  ]}]}),get:async()=>({a:4})});
+  const badges=await setup()['card-badges'](t);
+  assert.equal(badges[1].text,'⏱ ≈ 6 h previstas · 4 h pendientes');
+});
+test('uncosted milestones do not double-count work estimates',async()=>{
+  const t=client({card:async()=>({idList:TODO,desc:'',checklists:[
+    {name:'Logros',checkItems:[{id:'logro',name:'Primera web funcionando',state:'complete'}]},
+    {name:'Trabajo',checkItems:[{id:'tarea',name:'Rediseño · ≈ 5 h',state:'incomplete'}]}
+  ]})});
+  const badges=await setup()['card-badges'](t);
+  assert.match(badges[0].text,/50% \\(1\\/2\\)/);
+  assert.equal(badges[1].text,'⏱ ≈ 5 h previstas · 5 h pendientes');
+});
+test('v2 uppercase Trello headings preserve dependencies, time and summary',()=>{
+  const w={};vm.runInNewContext(embedded,{window:w});
+  const h=w.NBDependencies;
+  const desc='**NOTHING STUDIO — TAREA**\\nResumen visual.\\n\\n**DEPENDE DE**\\n[Studio 01](https://trello.com/c/CPRnmJFc)\\n\\n**DEDICACIÓN**\\nAproximadamente 1,5 h. Estimación retrospectiva.';
+  assert.deepEqual(plain(h.readDependencyIds(desc)),['CPRnmJFc']);
+  assert.deepEqual(plain(h.readHistoricHours(desc)),{min:1.5,max:1.5});
+  assert.equal(h.readPreview(desc),'Resumen visual.');
 });
