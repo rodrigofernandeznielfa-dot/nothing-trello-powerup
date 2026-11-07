@@ -18,7 +18,8 @@ function extract(card,estimate){
   const pending=items.filter(i=>!i.done);
   const allKnown=items.length>0 && pending.every(i=>typeof estimate[i.id]==="number"&&Number.isFinite(estimate[i.id])&&estimate[i.id]>=0);
   const remaining=allKnown?pending.reduce((n,i)=>n+estimate[i.id],0):null;
-  return {items,total,completed,remaining,hasDetailedItems:items.length>0};
+  const plan=window.NBDependencies.readTimePlan(card.checklists||[],estimate||{});
+  return {items,total,completed,remaining:plan?plan.remaining:remaining,plan,hasDetailedItems:items.length>0};
 }
 function previewSummary(desc){
  const summary=window.NBDependencies.readPreview(desc);
@@ -102,7 +103,7 @@ function renderReferences(card){
 function explicitNextDecision(desc){
  const lines=String(desc||"").replace(/\r/g,"").split("\n");
  for(let i=0;i<lines.length;i++){
-  if(lines[i].trim()==="**Siguiente decisión**" || lines[i].trim()==="**Siguiente paso**"){
+  if(/^\*\*SIGUIENTE (?:DECISIÓN|DECISION|PASO)\*\*$/i.test(lines[i].trim())){
    const next=lines.slice(i+1).find(x=>x.trim().length>0);
    if(next && !next.startsWith("**") && !next.startsWith("NB_"))return next.trim();
   }
@@ -136,10 +137,12 @@ function render(card,estimate,dependencies){
  const bar=el("track");bar.replaceChildren();
  if(s.total){for(let i=0;i<Math.min(s.total,20);i++){const seg=document.createElement("span");seg.className="segment"+(i<Math.round((s.completed/s.total)*Math.min(s.total,20))?" done":"");bar.append(seg)}}
  const historical=historic(card.desc);
- setText("spent",finished?historical||"Sin medir":"Sin medir");
- setText("spentCaption",historical&&finished?"Esfuerzo retrospectivo aproximado":"No hay sesiones activas verificadas");
- setText("remaining",finished?"0 h":s.remaining===null?"Sin estimar":asHours(s.remaining));
- setText("remainCaption",finished?"Criterios cerrados":s.remaining===null?"Faltan estimaciones por objetivo":"Según criterios aún pendientes");
+ setText("planned",s.plan?"≈ "+asHours(s.plan.planned):finished?"Sin estimación inicial":"Sin estimar");
+ setText("plannedCaption",s.plan?"Estimación total de los criterios con horas":"No hay un plan de horas registrado");
+ setText("spent",finished?historical||"Sin medir":"Sin registro");
+ setText("spentCaption",historical&&finished?"Dedicación retrospectiva, no cronometrada":"No se ha medido tiempo real de trabajo");
+ setText("remaining",finished?"0 h":s.remaining===null?"Sin estimar":"≈ "+asHours(s.remaining));
+ setText("remainCaption",finished?"Tarjeta cerrada":s.remaining===null?"Faltan estimaciones por criterio":"Se descuentan las tareas marcadas como completadas");
  const list=el("steps");list.replaceChildren();
  if(s.hasDetailedItems){s.items.slice(0,12).forEach(item=>{
    const li=document.createElement("li"),mark=document.createElement("span"),text=document.createElement("span");
@@ -154,7 +157,7 @@ function render(card,estimate,dependencies){
  setText("next",finished?"Trabajo cerrado. Consulta la descripción y las evidencias de la tarjeta.":blocked?"Continuaremos cuando se complete la dependencia.":explicitNextDecision(card.desc)||(next?next.name:"Revisar la descripción de la tarjeta para elegir el siguiente paso."));
  const warnings=[];
  if(!finished&&s.total&&s.completed===s.total)warnings.push("Checklist completa, pero la tarjeta todavía no está cerrada.");
- if(!finished&&s.remaining===null)warnings.push("Tiempo restante no calculable: faltan estimaciones o detalle de los criterios.");
+ if(!finished&&s.remaining===null)warnings.push("Tiempo restante sin calcular: añade horas aproximadas a las tareas de la checklist.");
  const warning=el("warning");warning.replaceChildren();
  warnings.forEach(w=>{const p=document.createElement("p");p.className="notice small";p.textContent=w;warning.append(p)});
  el("status").hidden=true;el("content").hidden=false;

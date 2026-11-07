@@ -1,4 +1,4 @@
-import {ESTIMATE_KEY,itemsOf,summarize,validHours} from "./core.js";
+import {ESTIMATE_KEY,itemsOf,summarize,validHours,hoursInName} from "./core.js?v=2";
 const t=window.TrelloPowerUp.iframe();
 const box=document.getElementById("items");
 const error=document.getElementById("error");
@@ -33,7 +33,10 @@ function render() {
     const input=document.createElement("input");
     input.dataset.itemId=item.id;input.type="number";input.min="0";input.max="999";input.step="0.5";
     input.placeholder="Horas";input.setAttribute("aria-label","Horas estimadas para "+item.name);
+    const guess=hoursInName(item.name);
     if(validHours(initial[item.id]))input.value=String(initial[item.id]);
+    else if(validHours(guess))input.value=String(guess);
+    input.title="Horas aproximadas; puedes corregirlas aquí o en el nombre del criterio";
     input.addEventListener("input",refreshPreview);
     label.append(text,input);box.append(label);
   }

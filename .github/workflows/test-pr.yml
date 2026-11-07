@@ -1,0 +1,27 @@
+name: Verify Power-Up estimate changes (no deploy)
+on:
+  pull_request:
+    paths:
+      - '*.js'
+      - '*.html'
+      - 'tests/**'
+      - '.github/workflows/test-pr.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify JS syntax
+        shell: bash
+        run: |
+          for f in *.js; do node --input-type=module --check < "$f"; done
+      - name: Test Power-Up and embedded connector
+        run: node --test tests/connector.test.cjs
