@@ -37,7 +37,8 @@ La sugerencia nace de una revisión del proyecto completo en ChatGPT: tareas act
 
 - **Rojo:** bloqueo por una dependencia sin resolver.
 - **Amarillo — Propuesta · siguiente tarea:** recomendación pendiente de la decisión del propietario. El panel explica acción, motivo, resultado esperado y fecha de revisión.
-- **Aceptar propuesta:** registra la elección y muestra **Próxima acordada**. No mueve tarjetas, no inicia agentes, no modifica código ni aprueba costes o assets.
+- **Aceptar propuesta:** registra la elección y muestra **Próxima acordada**. Para comenzar se mantiene el flujo habitual: el propietario elige la tarjeta en EN CURSO y dice «Mira Trello». No mueve tarjetas, no inicia agentes, no modifica código ni aprueba costes o assets.
+- La respuesta guardada no envía un mensaje a ChatGPT ni inicia una revisión. El conector de lectura de tarjetas no expone estos datos del Power-Up; ChatGPT respeta la selección manual en EN CURSO y cualquier decisión explícita del propietario.
 - **Ahora no:** aparca esa propuesta y retira su insignia amarilla. El panel conserva el motivo y permite revisar la decisión.
 - Una propuesta editada requiere una decisión nueva: no hereda una aceptación de otro texto. Un fallo de lectura o de escritura no se presenta como aceptación guardada.
 - Si hay bloqueo o dependencias sin comprobar, la sugerencia queda **en espera**; aceptarla no elimina el bloqueo.

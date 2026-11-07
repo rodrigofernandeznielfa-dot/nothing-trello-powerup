@@ -34,7 +34,7 @@ function renderRecommendation(card,decision,dependencies){
  for(const id of ["recommendation-accept","recommendation-dismiss","recommendation-reconsider"]){
   el(id).disabled=recommendationBusy||!writable||proposal.choice==="unavailable";
  }
- setText("recommendation-status",recommendationBusy?"Guardando tu decisión…":proposal.choice==="unavailable"?"No se ha podido comprobar tu decisión. Reabre la tarjeta antes de responder.":!writable?"Puedes leer la propuesta; para decidir necesitas permiso de edición.":waiting?"Hay dependencias pendientes o sin comprobar. Esta propuesta queda en espera; elegirla no elimina el bloqueo.":proposal.choice==="accepted"?"Has elegido esta como próxima. Permanecerá en POR HACER hasta que decidas empezarla.":proposal.choice==="dismissed"?"Has aparcado esta propuesta. Puedes volver a valorarla cuando quieras.":"Tú decides. Ningún botón mueve tarjetas ni inicia trabajo.");
+ setText("recommendation-status",recommendationBusy?"Guardando tu decisión…":proposal.choice==="unavailable"?"No se ha podido comprobar tu decisión. Reabre la tarjeta antes de responder.":!writable?"Puedes leer la propuesta; para decidir necesitas permiso de edición.":waiting?"Hay dependencias pendientes o sin comprobar. Esta propuesta queda en espera; elegirla no elimina el bloqueo.":proposal.choice==="accepted"?"Has elegido esta como próxima. Para empezar, muévela a EN CURSO y dime «Mira Trello».":proposal.choice==="dismissed"?"Has aparcado esta propuesta. Puedes volver a valorarla cuando quieras.":"Tú decides. Ningún botón mueve tarjetas ni inicia trabajo.");
 }
 async function decideRecommendation(choice){
  if(recommendationBusy||!currentRecommendation||!["accepted","dismissed","pending"].includes(choice))return;
