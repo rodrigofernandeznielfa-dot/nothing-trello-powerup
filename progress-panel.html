@@ -34,19 +34,43 @@ header{margin-bottom:10px}h2{font-size:14px;margin:0;font-weight:700}
 #status{color:#626f86;font-size:12px;padding:8px 0}
 #warning:not(:empty){margin-top:8px;color:#805900;font-size:11px}
 .notice{margin:3px 0}
+.recommendation{border:1px solid #e3c66c;border-left:4px solid #c49a25;background:#fff8df;color:#694d12;border-radius:8px;padding:12px;margin-bottom:12px;overflow-wrap:anywhere}
+.recommendation.accepted{background:#f1f7f4;border-color:#93b9a6;color:#24533f}
+.recommendation.dismissed{background:#f7f8f9;border-color:#c6ccd5;color:#44546f}
+.recommendation h3{margin:0;font-size:13px}.recommendation p{margin:8px 0 0;font-size:12px;line-height:1.5}
+.recommendation .action{font-weight:700;font-size:13px}
+.recommendation-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.recommendation button{font:600 12px/1.4 system-ui;min-height:36px;border:1px solid #856319;border-radius:5px;background:#fff;padding:7px 10px;color:#61490f;cursor:pointer}
+.recommendation button:first-child{background:#f3df9a}
+.recommendation button:focus-visible{outline:3px solid #172b4d;outline-offset:3px}
+.recommendation button:disabled{cursor:default;opacity:.6}
+#recommendation-status{font-size:11px}
 footer{margin-top:8px;font-size:10px;color:#626f86}
 [hidden]{display:none!important}
 </style>
 <script src="https://p.trellocdn.com/power-up.min.js"></script>
-<script src="./dependencies.js?v=5"></script>
+<script src="./dependencies.js?v=6"></script>
 <script src="./reference-catalog.js?v=2"></script>
-<script defer src="./progress-panel.js?v=15"></script>
+<script defer src="./progress-panel.js?v=16"></script>
 </head><body>
 <header><h2>Estado del trabajo</h2><span class="tag" id="state">Cargando</span></header>
 <div id="status">Consultando datos…</div>
 <div id="blocker" class="blocker" hidden></div>
 <div id="dependency-preview" class="preview" role="tooltip" hidden></div>
 <main id="content" hidden>
+<section class="recommendation" id="recommendation" aria-labelledby="recommendation-title" hidden>
+ <h3 id="recommendation-title">Propuesta · siguiente tarea</h3>
+ <p class="action" id="recommendation-action"></p>
+ <p><strong>Por qué ahora:</strong> <span id="recommendation-reason"></span></p>
+ <p><strong>Qué ganaríamos:</strong> <span id="recommendation-outcome"></span></p>
+ <p id="recommendation-date"></p>
+ <div class="recommendation-actions" id="recommendation-actions">
+  <button type="button" id="recommendation-accept">Aceptar propuesta</button>
+  <button type="button" id="recommendation-dismiss">Ahora no</button>
+ </div>
+ <div class="recommendation-actions" id="recommendation-reconsider-wrap" hidden><button type="button" id="recommendation-reconsider">Revisar mi decisión</button></div>
+ <p id="recommendation-status" role="status" aria-live="polite"></p>
+</section>
 <div class="summary">
  <div class="between"><span><strong>Progreso</strong> <span class="small" id="done"></span></span><span class="value" id="percent">—</span></div>
  <div class="track" id="track" aria-hidden="true"></div><span id="left" class="small"></span>

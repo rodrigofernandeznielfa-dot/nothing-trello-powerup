@@ -4,7 +4,66 @@ const t=window.TrelloPowerUp.iframe();
 const DONE="6aec66f2b6df305a261abb0b",TODO="6aec66ed3137d17f84ce7a3c",DOING="6aec66f02d325131dd44f8d8";
 const KEY="nothing_estimates_v1";
 const SNAP="nothing_work_snapshot_v1";
+const RECOMMENDATION="nothing_next_task_decision_v1";
 const el=id=>document.getElementById(id);
+let recommendationBusy=false,currentRecommendation=null;
+function readRecommendationDecision(){
+ return new Promise(resolve=>{
+  const timer=window.setTimeout(()=>resolve({unavailable:true}),900);
+  Promise.resolve().then(()=>t.get("card","shared",RECOMMENDATION,{})).then(value=>{
+   window.clearTimeout(timer);resolve(value);
+  },()=>{window.clearTimeout(timer);resolve({unavailable:true})});
+ });
+}
+function renderRecommendation(card,decision,dependencies){
+ const box=el("recommendation"),proposal=window.NBDependencies.recommendationFor(card,decision);
+ currentRecommendation=proposal?{cardId:card.id,proposal}:null;
+ box.hidden=!proposal;
+ if(!proposal)return;
+ const waiting=Boolean(dependencies&&(dependencies.blocked||dependencies.unavailable||(dependencies.missing||[]).length));
+ const decided=proposal.choice==="accepted"||proposal.choice==="dismissed";
+ const writable=typeof t.memberCanWriteToModel==="function"&&t.memberCanWriteToModel("card")===true;
+ box.className="recommendation"+(proposal.choice==="accepted"?" accepted":proposal.choice==="dismissed"?" dismissed":"");
+ setText("recommendation-title",proposal.choice==="accepted"?"Próxima tarea acordada":proposal.choice==="dismissed"?"Propuesta aparcada":"Propuesta · siguiente tarea");
+ setText("recommendation-action",proposal.action);
+ setText("recommendation-reason",proposal.reason);
+ setText("recommendation-outcome",proposal.outcome);
+ setText("recommendation-date","Revisión del proyecto: "+proposal.reviewed);
+ el("recommendation-actions").hidden=decided;
+ el("recommendation-reconsider-wrap").hidden=!decided;
+ for(const id of ["recommendation-accept","recommendation-dismiss","recommendation-reconsider"]){
+  el(id).disabled=recommendationBusy||!writable||proposal.choice==="unavailable";
+ }
+ setText("recommendation-status",recommendationBusy?"Guardando tu decisión…":proposal.choice==="unavailable"?"No se ha podido comprobar tu decisión. Reabre la tarjeta antes de responder.":!writable?"Puedes leer la propuesta; para decidir necesitas permiso de edición.":waiting?"Hay dependencias pendientes o sin comprobar. Esta propuesta queda en espera; elegirla no elimina el bloqueo.":proposal.choice==="accepted"?"Has elegido esta como próxima. Permanecerá en POR HACER hasta que decidas empezarla.":proposal.choice==="dismissed"?"Has aparcado esta propuesta. Puedes volver a valorarla cuando quieras.":"Tú decides. Ningún botón mueve tarjetas ni inicia trabajo.");
+}
+async function decideRecommendation(choice){
+ if(recommendationBusy||!currentRecommendation||!["accepted","dismissed","pending"].includes(choice))return;
+ if(currentRecommendation.proposal.choice==="unavailable")return;
+ if(typeof t.memberCanWriteToModel!=="function"||!t.memberCanWriteToModel("card"))return;
+ const selected=currentRecommendation;
+ recommendationBusy=true;
+ for(const id of ["recommendation-accept","recommendation-dismiss","recommendation-reconsider"])el(id).disabled=true;
+ setText("recommendation-status","Guardando tu decisión…");
+ try{
+  // Check the current proposal before saving a decision made from an older view.
+  const card=await t.card("id","idList","desc");
+  const latest=window.NBDependencies.recommendationFor(card,{});
+  if(card.id!==selected.cardId||!latest||latest.source!==selected.proposal.source){
+   throw new Error("proposal changed");
+  }
+  await t.set("card","shared",RECOMMENDATION,{source:latest.source,choice,updatedAt:new Date().toISOString()});
+  recommendationBusy=false;
+  await load();
+ }catch(error){
+  recommendationBusy=false;
+  setText("recommendation-status",error.message==="proposal changed"?"La propuesta ha cambiado. Reabre la tarjeta para revisar la versión actual.":"No se ha podido confirmar el guardado. Reabre la tarjeta antes de reintentar; tu decisión no se dará por guardada aquí.");
+  // Leave controls disabled: no automatic retry after an uncertain write.
+  console.warn("NOTHING recommendation decision",error);
+ }
+}
+el("recommendation-accept").addEventListener("click",()=>decideRecommendation("accepted"));
+el("recommendation-dismiss").addEventListener("click",()=>decideRecommendation("dismissed"));
+el("recommendation-reconsider").addEventListener("click",()=>decideRecommendation("pending"));
 function asHours(n){return Number.isFinite(n)?String(Math.round(n*10)/10).replace(".",",")+" h":"—"}
 function historic(desc){
   const value=window.NBDependencies.readHistoricHours(desc);
@@ -122,7 +181,7 @@ function explicitNextDecision(desc){
  }
  return null;
 }
-function render(card,estimate,dependencies,cached){
+function render(card,estimate,dependencies,cached,decision){
  const s=extract(card,estimate||{},cached);
  const finished=card.idList===DONE,progress=s.total?Math.round(s.completed*100/s.total):null;
  const blocked=!finished&&dependencies&&dependencies.blocked;
@@ -142,6 +201,7 @@ function render(card,estimate,dependencies,cached){
   });
   blocker.append(heading,details);blocker.hidden=false;
  }else blocker.hidden=true;
+ renderRecommendation(card,decision,dependencies);
  renderReferences(card);
  setText("percent",progress===null?"—":progress+"%");
  setText("done",s.total?s.completed+" completados":"Sin criterios");
@@ -194,10 +254,11 @@ const loadingTimeout=window.setTimeout(function(){
 },9000);
 async function load(){
  try{
-  const [card,estimate,cached]=await Promise.all([
+  const [card,estimate,cached,decision]=await Promise.all([
     t.card("id","idList","desc","checklists","badges"),
     t.get("card","shared",KEY,{}).catch(()=>({})),
-    t.get("card","shared",SNAP,{}).catch(()=>({}))
+    t.get("card","shared",SNAP,{}).catch(()=>({})),
+    readRecommendationDecision()
   ]);
   let dependencies={blocked:false,dependencies:[],missing:[]};
   if(card.idList!==DONE && window.NBDependencies.readDependencyIds(card.desc).length){
@@ -205,7 +266,7 @@ async function load(){
       const cards=await t.cards("id","name","shortLink","idList","desc");
       dependencies=window.NBDependencies.resolve(card.desc,cards,DONE);
       dependencies.dependencies.forEach(dep=>{const source=cards.find(c=>c.shortLink===dep.id);if(source){dep.desc=source.desc;dep.idList=source.idList}});
-    }catch(error){console.warn("NOTHING dependency lookup failed",error)}
+    }catch(error){dependencies.unavailable=true;console.warn("NOTHING dependency lookup failed",error)}
   }
   // In a card-detail iframe Trello normally supplies checkItems even when
   // card-badges on the board does not. Cache a verified snapshot for badges.
@@ -222,7 +283,7 @@ async function load(){
       t.set("card","shared",SNAP,current).catch(err=>console.warn("NOTHING estimate cache",err));
     }
   }
-  render(card,estimate||{},dependencies,cached);
+  render(card,estimate||{},dependencies,cached,decision);
   loaded=true;window.clearTimeout(loadingTimeout);
  }catch(err){
   loaded=true;window.clearTimeout(loadingTimeout);

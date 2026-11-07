@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NOTHING · Indicadores · Compatibilidad connector-v8.html</title>
+<title>NOTHING · Indicadores · Conector estable</title>
 <style>body{font:14px system-ui;background:#151b1f;color:#e9eff1;padding:16px}p{color:#b6c5cb}</style>
 <script src="https://p.trellocdn.com/power-up.min.js"></script>
 <!-- Embedded from dependencies.js; a regression test keeps the copies identical. -->
@@ -100,6 +100,36 @@ function hasUnestimatedCompleted(plan,done){
  // cannot prove zero effort for already-completed criteria without cost coverage.
  return done>0&&plan.planned===plan.remaining&&plan.estimatedCompletedCount!==done;
 }
+// A recommendation is authored after a project review, never inferred from
+// progress percentages, age, labels or a card's position. Decisions belong to
+// that exact text, so changing the proposal requires a new human decision.
+function readRecommendation(desc){
+ const source=readSection(desc,"PROPUESTA DE SIGUIENTE TAREA");
+ if(!source||source.length>1600)return null;
+ const fields={};
+ for(const line of source.split("\n")){
+  const match=line.match(/^([^:]+):\s*(.+)$/);
+  if(match)fields[headingKey(match[1])]=match[2].trim();
+ }
+ if(!fields.accion||!fields.motivo||!fields.resultado||!/^\d{4}-\d{2}-\d{2}$/.test(fields.revision||""))return null;
+ return {source,action:fields.accion,reason:fields.motivo,outcome:fields.resultado,reviewed:fields.revision};
+}
+function recommendationFor(card,decision){
+ if(!card||card.idList!=="6aec66ed3137d17f84ce7a3c"||card.closed)return null;
+ const proposal=readRecommendation(card.desc);
+ if(!proposal)return null;
+ const choice=decision&&decision.source===proposal.source&&["accepted","dismissed"].includes(decision.choice)
+  ?decision.choice:"pending";
+ return {...proposal,choice:decision&&decision.unavailable?"unavailable":choice};
+}
+function recommendationBadge(card,decision,waiting){
+ const proposal=recommendationFor(card,decision);
+ if(!proposal||proposal.choice==="dismissed")return null;
+ if(proposal.choice==="unavailable")return {text:"Propuesta · revisar decisión",color:"yellow"};
+ if(waiting)return {text:proposal.choice==="accepted"?"Elegida · en espera":"Propuesta · en espera",color:"yellow"};
+ return proposal.choice==="accepted"?{text:"Próxima acordada",color:"green"}
+  :{text:"Propuesta · siguiente tarea",color:"yellow"};
+}
 function resolve(desc,cards,doneListId){
  const ids=readDependencyIds(desc);
  if(!ids.length)return {blocked:false,dependencies:[],missing:[]};
@@ -112,13 +142,13 @@ function resolve(desc,cards,doneListId){
  }
  return {blocked:unresolved.length>0,dependencies:unresolved,missing};
 }
-root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan,readTimeSummary,hasUnestimatedCompleted};
+root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan,readTimeSummary,hasUnestimatedCompleted,readRecommendation,recommendationFor,recommendationBadge};
 })(typeof window!=="undefined"?window:globalThis);
 </script>
 <script>
 (function(){
   "use strict";
-  var KEY="nothing_estimates_v1",SNAP="nothing_work_snapshot_v1",IDEAS="6aec66eb5ff8ae196d37b7ca",DONE="6aec66f2b6df305a261abb0b";
+  var KEY="nothing_estimates_v1",SNAP="nothing_work_snapshot_v1",IDEAS="6aec66eb5ff8ae196d37b7ca",DONE="6aec66f2b6df305a261abb0b",RECOMMENDATION="nothing_next_task_decision_v1";
   // Trello normally abandons capability replies after five seconds.
   function within(promise,ms){
     return new Promise(function(resolve,reject){
@@ -130,9 +160,10 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
     var data=await Promise.all([
       within(t.card("idList","checklists","badges","desc"),1500),
       within(t.get("card","shared",KEY,{}),900).catch(function(){return {}}),
-      within(t.get("card","shared",SNAP,{}),900).catch(function(){return {}})
+      within(t.get("card","shared",SNAP,{}),900).catch(function(){return {}}),
+      within(t.get("card","shared",RECOMMENDATION,{}),900).catch(function(){return {unavailable:true}})
     ]);
-    var card=data[0],estimates=data[1]||{},snapshot=data[2]||{};
+    var card=data[0],estimates=data[1]||{},snapshot=data[2]||{},decision=data[3]||{};
     if(card.idList===IDEAS)return [];
     var dependencyReader=window.NBDependencies;
     var ids=dependencyReader?dependencyReader.readDependencyIds(card.desc):[];
@@ -147,6 +178,11 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
     }
     var blockedBadge=dependencyStatus.blocked?{text:"Bloqueada",color:"red"}
       :dependencyUnknown && card.idList!==DONE?{text:"Dependencias sin comprobar",color:"orange"}:null;
+    var suggestion=dependencyReader?dependencyReader.recommendationBadge(card,decision,dependencyStatus.blocked||dependencyUnknown):null;
+    function withSignals(badges){
+      if(suggestion)badges=[suggestion].concat(badges);
+      return blockedBadge?[blockedBadge].concat(badges):badges;
+    }
     var items=(card.checklists||[]).reduce(function(a,c){return a.concat(c.checkItems||[])},[]);
     var native=card.badges||{};
     var nativeTotal=Number(native.checkItems)||0;
@@ -156,7 +192,7 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
     if(!items.length && !nativeTotal){
       var onlyTime=card.idList===DONE && historic?
         [{text:"⏱ "+String(historic.min).replace(".",",")+(historic.max!==historic.min?"–"+String(historic.max).replace(".",","):"")+" h",color:"light-gray"}]:[];
-      return blockedBadge?[blockedBadge].concat(onlyTime):onlyTime;
+      return withSignals(onlyTime);
     }
     var plan=dependencyReader?dependencyReader.readTimePlan(card.checklists||[],estimates):null;
     var persisted=dependencyReader?dependencyReader.readTimeSummary(card.desc):null;
@@ -193,7 +229,7 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
       {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")",color:percent===100?"green":"blue"}
     ];
     if(timeText)badges.push({text:timeText,color:"light-gray"});
-    return blockedBadge?[blockedBadge].concat(badges):badges;
+    return withSignals(badges);
   }
   window.TrelloPowerUp.initialize({
     "card-back-section":function(t){
@@ -202,7 +238,7 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
         icon:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/panel-icon.svg",
         content:{
           type:"iframe",
-          url:t.signUrl("https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/progress-panel.html?v=15"),
+          url:t.signUrl("https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/progress-panel.html?v=16"),
           height:355
         }
       };
@@ -210,7 +246,7 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
 
     "card-buttons":function(t){return [{text:"NOTHING · Estimar criterios",condition:"always",callback:function(ctx){return ctx.popup({title:"Estimaciones de trabajo",url:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/estimate.html?v=2",height:420})}}]},
     "card-badges":async function(t){try{return await getBadges(t)}catch(e){console.error("NOTHING badge",e);return [{text:"NB · ERROR DE LECTURA",color:"red"}]}},
-    "card-detail-badges":async function(t){try{var a=await getBadges(t);return a.map(function(x,i){return Object.assign({title:x.color==="red"||x.color==="orange"?"Dependencias":x.text.indexOf("▰")===0||x.text.indexOf("▱")===0?"Progreso verificado":"Tiempo"},x)})}catch(e){console.error("NOTHING detail",e);return [{title:"NOTHING",text:"Error de lectura · reabrir tarjeta",color:"orange"}]}}
+    "card-detail-badges":async function(t){try{var a=await getBadges(t);return a.map(function(x,i){return Object.assign({title:/^(Propuesta|Próxima acordada|Elegida)/.test(x.text)?"Propuesta de siguiente tarea":x.color==="red"||x.color==="orange"?"Dependencias":x.text.indexOf("▰")===0||x.text.indexOf("▱")===0?"Progreso verificado":"Tiempo"},x)})}catch(e){console.error("NOTHING detail",e);return [{title:"NOTHING",text:"Error de lectura · reabrir tarjeta",color:"orange"}]}}
   });
 })();
 </script></head><body><h1>NOTHING · Indicadores</h1><p>Progreso verificado y horas pendientes, directamente en las tarjetas.</p></body></html>
