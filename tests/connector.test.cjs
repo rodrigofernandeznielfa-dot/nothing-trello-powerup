@@ -34,7 +34,7 @@ test('registers every capability without loading the optional helper',()=>{
 test('keeps verified native progress and unknown time',async()=>{
   const b=await setup()['card-badges'](client());
   assert.match(b[0].text,/29% \(2\/7\)/);
-  assert.equal(b[1].text,'Sin estimar');
+  assert.equal(b[1].text,'⏱ Sin estimar');
 });
 test('missing optional script preserves progress and does not invent dependency state',async()=>{
   const b=await setup(false)['card-badges'](client({card:async()=>({idList:TODO,desc:'NB_DEPENDENCIES_V1: CPRnmJFc',badges:{checkItems:5}})}));
@@ -44,7 +44,7 @@ test('missing optional script preserves progress and does not invent dependency 
 test('hanging estimates cannot swallow the progress badges',async()=>{
   const start=Date.now(),b=await setup()['card-badges'](client({get:never}));
   assert.match(b[0].text,/2\/7/);
-  assert.equal(b[1].text,'Sin estimar');
+  assert.equal(b[1].text,'⏱ Sin estimar');
   assert.ok(Date.now()-start<3000);
 });
 test('hanging board lookup leaves dependencies unknown and still returns progress',async()=>{
@@ -134,7 +134,7 @@ test('uncosted milestones do not double-count work estimates',async()=>{
 test('v2 uppercase Trello headings preserve dependencies, time and summary',()=>{
   const w={};vm.runInNewContext(embedded,{window:w});
   const h=w.NBDependencies;
-  const desc='**NOTHING STUDIO — TAREA**\\nResumen visual.\\n\\n**DEPENDE DE**\\n[Studio 01](https://trello.com/c/CPRnmJFc)\\n\\n**DEDICACIÓN**\\nAproximadamente 1,5 h. Estimación retrospectiva.';
+  const desc='**NOTHING STUDIO — TAREA**\nResumen visual.\n\n**DEPENDE DE**\n[Studio 01](https://trello.com/c/CPRnmJFc)\n\n**DEDICACIÓN**\nAproximadamente 1,5 h. Estimación retrospectiva.';
   assert.deepEqual(plain(h.readDependencyIds(desc)),['CPRnmJFc']);
   assert.deepEqual(plain(h.readHistoricHours(desc)),{min:1.5,max:1.5});
   assert.equal(h.readPreview(desc),'Resumen visual.');
