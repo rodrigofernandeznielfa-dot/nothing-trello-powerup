@@ -1,5 +1,16 @@
 # NOTHING · INDICADORES — Power-Up de Trello
 
+## Criterio de producto: Trello nativo primero
+
+El Power-Up complementa Trello; no lo sustituye ni duplica campos nativos. Las columnas representan el estado real, las etiquetas existentes representan categorías/prioridades, las checklists son los criterios verificables y los comentarios/adjuntos guardan decisiones y evidencias. Si existen Campos personalizados nativos en el plan del usuario, preferirlos a crear controles duplicados.
+
+El panel propio se limita a información derivada que Trello no presenta directamente: progreso verificable, horas previstas y pendientes con cobertura explícita, dependencias/bloqueos, y propuesta de siguiente tarea con botones reales `Aceptar propuesta` y `Ahora no`. Usar color con significado (rojo bloqueo; amarillo decisión pendiente; verde validado), diseño sobrio, contraste accesible y sin filas de emojis. Una decisión no cambia automáticamente el estado ni ejecuta agentes.
+
+**Pendiente de compatibilidad:** el lector histórico `dependencies.js` interpreta dependencias, propuestas y algunos resúmenes de horas desde bloques Markdown de las descripciones. Una descripción compacta puede dejar esos campos invisibles al Power-Up. Para evolucionarlo, migrar estado propio y decisiones a `t.get/t.set` u otra fuente apropiada y conservar lectores antiguos como compatibilidad transitoria. No almacenar de nuevo datos estructurados del Power-Up en descripciones/comentarios. Si faltan datos, mostrar «Sin estimar» o «Pendiente de migrar», no un éxito falso.
+
+No afirmar despliegue o activación por GitHub Pages o CI solamente: probar en un tablero autenticado con el Power-Up habilitado. Este repositorio es público: no introducir información privada, ejemplos reales del propietario ni tokens.
+
+
 Panel visual para seguimiento del videojuego **NOTHING BITES** y del estudio **APPARENTLY NOTHING**.
 
 ## Tiempo previsto y pendiente
