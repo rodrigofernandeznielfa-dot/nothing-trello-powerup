@@ -282,3 +282,14 @@ test('all 18 configured URLs serve the same stable connector, including recommen
   assert.equal(fs.readFileSync(path.join(root,file),'utf8'),html,file);
  }
 });
+
+test('native-first compact cards expose their meta and only explicit dependencies',()=>{
+ const ctx=vm.createContext({window:{}});
+ vm.runInContext(fs.readFileSync(path.join(root,'dependencies.js'),'utf8'),ctx);
+ const helper=ctx.window.NBDependencies;
+ const blocked='🎯 **META** · Puente de datos reversible\n🧱 **BLOQUEO** · Depende de [Studio 01](https://trello.com/c/CPRnmJFc) y [Studio 02](https://trello.com/c/tKMRgTQQ)\n📁 **EXPEDIENTE** · [Issue](https://github.com/example/example/issues/1)';
+ assert.equal(helper.readPreview(blocked),'Puente de datos reversible');
+ assert.deepEqual(plain(helper.readDependencyIds(blocked)),['CPRnmJFc','tKMRgTQQ']);
+ const unrelated='🎯 **META** · Puente\n🧱 **BLOQUEO** · Validación pendiente\n📁 **EXPEDIENTE** · [Studio 01](https://trello.com/c/CPRnmJFc)';
+ assert.deepEqual(plain(helper.readDependencyIds(unrelated)),[]);
+});

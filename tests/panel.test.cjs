@@ -174,3 +174,10 @@ test('hanging recommendation lookup cannot hide the existing progress panel',asy
  const started=Date.now(),p=await panel(proposalCard(),{writable:true,recommendationReadHangs:true});
  assert.match(p.text('recommendation-status'),/No se ha podido comprobar/);assert.equal(p.node('recommendation-accept').disabled,true);assert.ok(Date.now()-started<2000);
 });
+
+test('compact cards keep their native next step instead of a generic fallback',async()=>{
+ const desc='🎯 **META** · Taller de ejemplos\n⚪ **POR HACER** · Pendiente de prueba\n▶️ **PRÓXIMO** · Probar un lote pequeño de prueba\n📁 **EXPEDIENTE** · [Informe](https://github.com/example/test/issues/1)';
+ const p=await panel(card({desc}));
+ assert.equal(p.text('next'),'Probar un lote pequeño de prueba');
+ assert.equal(p.text('state'),'En curso');
+});

@@ -96,7 +96,7 @@ function previewSummary(desc){
  const summary=window.NBDependencies.readPreview(desc);
  if(!summary)return "Resumen breve pendiente de preparar.";
  const clean=summary.replace(/\s+/g," ").trim();
- return clean.length<=110?clean:"Resumen demasiado largo: revisar la ficha de esta tarea.";
+ return clean.length<=110?clean:clean.slice(0,107).trimEnd()+"…";
 }
 function previewTitle(name){
  const match=String(name||"").match(/NOTHING Studio\s+\d+/i);
@@ -179,6 +179,8 @@ function explicitNextDecision(desc){
    if(next && !next.startsWith("**") && !next.startsWith("NB_"))return next.trim();
   }
  }
+ const compact=lines.find(line=>/\*\*(?:PRÓXIMO|PROXIMO|SIGUIENTE|SIGUIENTE PASO)\*\*\s*[·:—-]/i.test(line));
+ if(compact)return compact.replace(/^.*?\*\*(?:PRÓXIMO|PROXIMO|SIGUIENTE|SIGUIENTE PASO)\*\*\s*[·:—-]\s*/i,"").trim();
  return null;
 }
 function render(card,estimate,dependencies,cached,decision){

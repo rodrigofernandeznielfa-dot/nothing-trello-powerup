@@ -25,10 +25,15 @@ function readSection(desc,heading){
  return result.join("\n").trim();
 }
 function readDependencyIds(desc){
- const legacy=String(desc||"").match(/^NB_DEPENDENCIES_V1:\s*([A-Za-z0-9,\s-]+)$/m);
- const ids=legacy?legacy[1].split(",").map(x=>x.trim())
-  :Array.from(readSection(desc,"Depende de").matchAll(/https:\/\/trello\.com\/c\/([A-Za-z0-9]{8})(?=[/)\s]|$)/g),m=>m[1]);
- return [...new Set(ids.filter(x=>/^[A-Za-z0-9]{8}$/.test(x)))].slice(0,12);
+ const source=String(desc||"");
+ const legacy=source.match(/^NB_DEPENDENCIES_V1:\s*([A-Za-z0-9,\s-]+)$/m);
+ const stored=legacy?legacy[1].split(",").map(x=>x.trim()):[];
+ const section=Array.from(readSection(source,"Depende de").matchAll(/https:\/\/trello\.com\/c\/([A-Za-z0-9]{8})(?=[/)\s]|$)/g),m=>m[1]);
+ // Compact cards can show real native Trello links without a technical block.
+ // Only recognize explicit dependencies, never unrelated references.
+ const visible=source.split("\n").filter(line=>/\*\*(?:BLOQUEO|DEPENDE DE)\*\*\s*[·:—-]?\s*(?:Depende de|Requiere)\b/i.test(line));
+ const inline=visible.flatMap(line=>Array.from(line.matchAll(/https:\/\/trello\.com\/c\/([A-Za-z0-9]{8})(?=[/)\s]|$)/g),m=>m[1]));
+ return [...new Set([...stored,...section,...inline].filter(x=>/^[A-Za-z0-9]{8}$/.test(x)))].slice(0,12);
 }
 function readHistoricHours(desc){
  const legacy=String(desc||"").match(/NB_TIME_HISTORIC_ESTIMATE_V1 min=(\d+(?:\.\d+)?) max=(\d+(?:\.\d+)?)/);
@@ -45,6 +50,9 @@ function readPreview(desc){
  const section=readSection(desc,"Resumen");
  if(section)return section.split(/\n\s*\n/)[0].trim();
  const parts=String(desc||"").replace(/\r/g,"").split("\n");
+ // A compact card has an inline heading rather than a paragraph below it.
+ const compact=parts.find(line=>/\*\*(?:META|OBJETIVO|CONCEPTO|PROPÓSITO|PROPOSITO|QUÉ ES|QUE ES)\*\*\s*[·:—-]/i.test(line));
+ if(compact)return compact.replace(/^.*?\*\*(?:META|OBJETIVO|CONCEPTO|PROPÓSITO|PROPOSITO|QUÉ ES|QUE ES)\*\*\s*[·:—-]\s*/i,"").trim();
  if(/^\*\*[^*]+\*\*$/.test((parts[0]||"").trim()))return (parts[1]||"").trim();
  return "";
 }
