@@ -47,6 +47,41 @@ header{margin-bottom:10px}h2{font-size:14px;margin:0;font-weight:700}
 #recommendation-status{font-size:11px}
 footer{margin-top:8px;font-size:10px;color:#626f86}
 [hidden]{display:none!important}
+
+/* Adaptive, high-contrast NOTHING palette for narrow panels and dark mode. */
+@media (max-width:420px){
+ body{padding:10px 11px}
+ .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .grid>div:last-child{grid-column:1/-1}
+ .recommendation-actions button{flex:1 1 110px}
+}
+@media (prefers-color-scheme:dark){
+ :root{color-scheme:dark}
+ body{background:#111a20;color:#e9f1f3}
+ .summary{background:#19262c;border-color:#40525b}
+ .small,.muted,footer,#status,.preview-hint{color:#b9cbd1}
+ .tag,.preview-state{background:#2a3a42;color:#e2edf1}
+ .tag.blocked{background:#42292b;border-color:#9d5557;color:#ffd1cb}
+ .blocker{background:#42292b;color:#ffd1cb}
+ .blocker a{color:#ffb5ac}
+ .preview{background:#1b2a31;color:#e9f1f3;border-color:#50616b}
+ .preview-title,.time,.value{color:#f0f5f7}
+ .preview-desc{color:#d5e4e9}
+ .references,.grid{border-color:#43535c}
+ .references-head{color:#b9cbd1}
+ .references-links a{color:#a7cff9}
+ .track .segment{background:#43535c}
+ .track .segment.done{background:#50b18c}
+ .next{background:#213b32;border-left-color:#50b18c}
+ .next strong{color:#cce9dd}
+ #warning:not(:empty){color:#ffd88c}
+ .recommendation{background:#3b311c;border-color:#8b733e;border-left-color:#e9c169;color:#ffe9ae}
+ .recommendation.accepted{background:#203d30;border-color:#569a7a;color:#d2f4df}
+ .recommendation.dismissed{background:#2c3941;border-color:#657781;color:#d9e4e9}
+ .recommendation button{background:#302b21;border-color:#e6c774;color:#ffe9ab}
+ .recommendation button:first-child{background:#f0d58e;border-color:#f0d58e;color:#271f0f}
+ .recommendation button:focus-visible{outline-color:#dcefff}
+}
 </style>
 <script src="https://p.trellocdn.com/power-up.min.js"></script>
 <script src="./dependencies.js?v=6"></script>
