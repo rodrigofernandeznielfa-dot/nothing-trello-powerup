@@ -50,9 +50,14 @@ footer{margin-top:8px;font-size:10px;color:#626f86}
 
 /* Adaptive, high-contrast NOTHING palette for narrow panels and dark mode. */
 @media (max-width:420px){
- body{padding:10px 11px}
+ body{padding:10px 11px;font-size:14px;line-height:1.45}
  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
  .grid>div:last-child{grid-column:1/-1}
+ .small,.muted,.tag,.references-head,.next strong,.blocker strong,#warning:not(:empty),#recommendation-status{font-size:12px}
+ .blocker p,.references-links a,.recommendation p{font-size:13px}
+ .value{font-size:20px}
+ footer,.preview-hint{font-size:11px;line-height:1.5}
+ .recommendation button{font-size:13px;min-height:40px}
  .recommendation-actions button{flex:1 1 110px}
 }
 @media (prefers-color-scheme:dark){

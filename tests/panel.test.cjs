@@ -98,7 +98,7 @@ test('every supported connector reloads the corrected card panel',()=>{
   const html=fs.readFileSync(path.join(root,'progress-panel.html'),'utf8');
   assert.match(html,/progress-panel\.js\?v=18/);assert.match(html,/dependencies\.js\?v=8/);
   for(const file of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
-    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=19/,file);
+    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=20/,file);
   }
 });
 
