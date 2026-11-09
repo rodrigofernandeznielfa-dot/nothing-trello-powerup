@@ -75,7 +75,22 @@ const evidence=process.env.NB_PANEL_EVIDENCE_DIR||path.join(root,'evidence');
   assert.equal(await page.locator('#next').textContent(),'Validar una importación aislada');
   assert.equal(await page.locator('#remaining').textContent(),'Sin estimar');
   await page.screenshot({path:path.join(evidence,'editorial-unblocked.png'),fullPage:true});
-  console.log('BROWSER_EDITORIAL_V3_OK: blocked/unblocked, rough hours, sources and next step at 320/620px');
+  // The owner uses Android dark mode; confirm actual CSS and link contrast.
+  await page.emulateMedia({colorScheme:'dark'});
+  await page.setViewportSize({width:320,height:800});
+  const palette=await page.evaluate(()=>({
+    body:getComputedStyle(document.body).backgroundColor,
+    link:getComputedStyle(document.querySelector('#references a')).color,
+    overflow:document.documentElement.scrollWidth>innerWidth
+  }));
+  assert.equal(palette.body,'rgb(17, 26, 32)');
+  assert.equal(palette.link,'rgb(167, 207, 249)');
+  assert.equal(palette.overflow,false);
+  await page.locator('#references a').first().focus();
+  assert.equal(await page.evaluate(()=>getComputedStyle(document.activeElement).outlineStyle),'solid');
+  await page.screenshot({path:path.join(evidence,'editorial-v3-dark-320.png'),fullPage:true});
+  console.log('BROWSER_EDITORIAL_V3_OK: 320/620px, light/dark, accessibility focus, blocked/unblocked, honest time');
+
   assert.deepEqual(errors,[]);
   console.log('BROWSER_PANEL_TEST_OK: 9/36, missing details, mobile/desktop layout, 2-hour decrement verified');
  }finally{await browser.close()}
