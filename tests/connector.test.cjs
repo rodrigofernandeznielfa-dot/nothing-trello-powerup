@@ -293,3 +293,49 @@ test('native-first compact cards expose their meta and only explicit dependencie
  const unrelated='🎯 **META** · Puente\n🧱 **BLOQUEO** · Validación pendiente\n📁 **EXPEDIENTE** · [Studio 01](https://trello.com/c/CPRnmJFc)';
  assert.deepEqual(plain(helper.readDependencyIds(unrelated)),[]);
 });
+
+
+test('editorial 3S v3 renders italic lead and multiline blocker without collecting reference links',()=>{
+ const ctx=vm.createContext({window:{}});
+ vm.runInContext(fs.readFileSync(path.join(root,'dependencies.js'),'utf8'),ctx);
+ const helper=ctx.window.NBDependencies;
+ const desc='*Puente seguro entre Studio y Godot*\n\n**Bloqueo**\nDepende de [Studio 01](https://trello.com/c/CPRnmJFc) · [Studio 02](https://trello.com/c/tKMRgTQQ)\n\n**Siguiente paso**\nProbar una importación ficticia\n\n---\n\n*Referencias · [No es dependencia](https://trello.com/c/GUKFRrxj)*';
+ assert.equal(helper.readPreview(desc),'Puente seguro entre Studio y Godot');
+ assert.deepEqual(plain(helper.readDependencyIds(desc)),['CPRnmJFc','tKMRgTQQ']);
+ const state=helper.resolve(desc,[
+  {shortLink:'CPRnmJFc',idList:TODO,name:'Studio 01'},
+  {shortLink:'tKMRgTQQ',idList:DONE,name:'Studio 02'}
+ ],DONE);
+ assert.equal(state.blocked,true);
+ assert.deepEqual(plain(state.dependencies.map(x=>x.id)),['CPRnmJFc']);
+ assert.deepEqual(plain(state.missing),[]);
+ assert.ok(!helper.readSection(desc,'Bloqueo').includes('Referencias'));
+});
+
+test('editorial references, rough estimates and ordinary blockers never invent dependencies or hours',()=>{
+ const ctx=vm.createContext({window:{}});
+ vm.runInContext(fs.readFileSync(path.join(root,'dependencies.js'),'utf8'),ctx);
+ const helper=ctx.window.NBDependencies;
+ const desc='*Prueba aislada de exportación*\n\n**Bloqueo**\nValidación en Windows pendiente\n\n*Estimación previa · ≈11 h orientativas*\n\n---\n\n*Referencias · [Studio 01](https://trello.com/c/CPRnmJFc)*';
+ assert.equal(helper.readPreview(desc),'Prueba aislada de exportación');
+ assert.deepEqual(plain(helper.readDependencyIds(desc)),[]);
+ assert.equal(helper.readTimeSummary(desc),null);
+ const old='🎯 **META** · Puente reversible\n🧱 **BLOQUEO** · Depende de [Studio](https://trello.com/c/CPRnmJFc)';
+ assert.equal(helper.readPreview(old),'Puente reversible');
+ assert.deepEqual(plain(helper.readDependencyIds(old)),['CPRnmJFc']);
+});
+
+test('editorial multiline dependency remains red on the card and each legacy connector',async()=>{
+ const desc='*Editor de NPC*\n\n**Bloqueo**\nDepende de [Studio](https://trello.com/c/CPRnmJFc)\n\n---\n\n*Referencias · [Another unrelated card](https://trello.com/c/GUKFRrxj)*';
+ const c=setup();
+ const badges=await c['card-badges'](client({
+   card:async()=>({idList:TODO,desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}}),
+   cards:async()=>[{shortLink:'CPRnmJFc',name:'Studio',idList:TODO}]
+ }));
+ assert.equal(badges[0]?.color,'red');
+ for(const name of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
+  const code=fs.readFileSync(path.join(root,name),'utf8');
+  assert.match(code,/progress-panel\.html\?v=17/,name);
+  assert.match(code,/readSection\(source,"Bloqueo"\)/,name);
+ }
+});

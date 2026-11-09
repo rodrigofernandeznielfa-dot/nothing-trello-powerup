@@ -96,9 +96,9 @@ test('zero remaining/completed estimates are valid and readonly cache errors do 
 });
 test('every supported connector reloads the corrected card panel',()=>{
   const html=fs.readFileSync(path.join(root,'progress-panel.html'),'utf8');
-  assert.match(html,/progress-panel\.js\?v=16/);assert.match(html,/dependencies\.js\?v=6/);
+  assert.match(html,/progress-panel\.js\?v=16/);assert.match(html,/dependencies\.js\?v=7/);
   for(const file of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
-    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=16/,file);
+    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=17/,file);
   }
 });
 
@@ -180,4 +180,13 @@ test('compact cards keep their native next step instead of a generic fallback',a
  const p=await panel(card({desc}));
  assert.equal(p.text('next'),'Probar un lote pequeño de prueba');
  assert.equal(p.text('state'),'En curso');
+});
+
+
+test('editorial 3S v3 displays the actual next step with no invented remaining effort',async()=>{
+ const desc='*Estudio sencillo y visual*\n\n**Situación actual**\nPrototipo pendiente de validar\n\n**Siguiente paso**\nProbar fichas, búsqueda y exportación en Windows\n\n*Estimación previa · ≈11 h orientativas*\n\n---\n\n*Referencias · [Archivo](https://github.com/example/test/issues/1)*';
+ const p=await panel(card({desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}}));
+ assert.equal(p.text('next'),'Probar fichas, búsqueda y exportación en Windows');
+ assert.equal(p.text('planned'),'Sin estimar');
+ assert.equal(p.text('remaining'),'Sin estimar');
 });

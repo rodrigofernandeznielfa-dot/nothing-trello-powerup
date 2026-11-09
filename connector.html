@@ -20,6 +20,8 @@ function readSection(desc,heading){
  const result=[];
  for(const line of lines.slice(start+1)){
   if(/^\*\*[^*]+\*\*\s*$/.test(line.trim()))break;
+  // A final separator and the reference footer are not part of a section.
+  if(/^(?:-{3,}|_{3,}|\*{3,})\s*$/.test(line.trim())||/^\*?Referencias\s*[·:—-]/i.test(line.trim()))break;
   result.push(line);
  }
  return result.join("\n").trim();
@@ -28,11 +30,16 @@ function readDependencyIds(desc){
  const source=String(desc||"");
  const legacy=source.match(/^NB_DEPENDENCIES_V1:\s*([A-Za-z0-9,\s-]+)$/m);
  const stored=legacy?legacy[1].split(",").map(x=>x.trim()):[];
- const section=Array.from(readSection(source,"Depende de").matchAll(/https:\/\/trello\.com\/c\/([A-Za-z0-9]{8})(?=[/)\s]|$)/g),m=>m[1]);
- // Compact cards can show real native Trello links without a technical block.
- // Only recognize explicit dependencies, never unrelated references.
+ const linkIds=text=>Array.from(String(text||"").matchAll(/https:\/\/trello\.com\/c\/([A-Za-z0-9]{8})(?=[/)\s]|$)/g),m=>m[1]);
+ // Legacy dependency sections and inline compact cards remain supported.
+ const section=[...linkIds(readSection(source,"Depende de")),...linkIds(readSection(source,"Dependencias"))];
  const visible=source.split("\n").filter(line=>/\*\*(?:BLOQUEO|DEPENDE DE)\*\*\s*[·:—-]?\s*(?:Depende de|Requiere)\b/i.test(line));
- const inline=visible.flatMap(line=>Array.from(line.matchAll(/https:\/\/trello\.com\/c\/([A-Za-z0-9]{8})(?=[/)\s]|$)/g),m=>m[1]));
+ // Editorial 3S v3 displays the explicit blocker on the next line:
+ // **Bloqueo**\nDepende de [Studio](https://trello.com/c/...).
+ // Only parse lines which DECLARE a dependency: never infer it from references.
+ const blocker=readSection(source,"Bloqueo").split("\n").map(line=>line.trim())
+  .filter(line=>/^(?:[-*]\s*)?(?:Depende de|Requiere)\b/i.test(line));
+ const inline=[...visible,...blocker].flatMap(linkIds);
  return [...new Set([...stored,...section,...inline].filter(x=>/^[A-Za-z0-9]{8}$/.test(x)))].slice(0,12);
 }
 function readHistoricHours(desc){
@@ -53,6 +60,9 @@ function readPreview(desc){
  // A compact card has an inline heading rather than a paragraph below it.
  const compact=parts.find(line=>/\*\*(?:META|OBJETIVO|CONCEPTO|PROPÓSITO|PROPOSITO|QUÉ ES|QUE ES)\*\*\s*[·:—-]/i.test(line));
  if(compact)return compact.replace(/^.*?\*\*(?:META|OBJETIVO|CONCEPTO|PROPÓSITO|PROPOSITO|QUÉ ES|QUE ES)\*\*\s*[·:—-]\s*/i,"").trim();
+ // Editorial 3S v3 starts with a short, standalone italic lead paragraph.
+ const first=(parts.find(line=>line.trim())||"").trim();
+ if(first.length<=240 && /^\*[^*].+[^*]\*$/.test(first) && !/^\*(?:Referencias|Estimaci[oó]n)\b/i.test(first) && !/https?:\/\//i.test(first))return first.slice(1,-1).trim();
  if(/^\*\*[^*]+\*\*$/.test((parts[0]||"").trim()))return (parts[1]||"").trim();
  return "";
 }
@@ -246,7 +256,7 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
         icon:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/panel-icon.svg",
         content:{
           type:"iframe",
-          url:t.signUrl("https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/progress-panel.html?v=16"),
+          url:t.signUrl("https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/progress-panel.html?v=17"),
           height:355
         }
       };
