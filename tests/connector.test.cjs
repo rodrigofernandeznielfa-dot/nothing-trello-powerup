@@ -335,7 +335,7 @@ test('editorial multiline dependency remains red on the card and each legacy con
  assert.equal(badges[0]?.color,'red');
  for(const name of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
   const code=fs.readFileSync(path.join(root,name),'utf8');
-  assert.match(code,/progress-panel\.html\?v=21/,name);
+  assert.match(code,/progress-panel\.html\?v=22/,name);
   assert.match(code,/readSection\(source,"Bloqueo"\)/,name);
  }
 });

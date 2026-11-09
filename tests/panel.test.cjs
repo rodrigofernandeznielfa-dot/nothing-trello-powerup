@@ -14,12 +14,12 @@ class Element{
   addEventListener(name,callback){this.events[name]=callback;}
   setAttribute(){}
 }
-async function panel(card,{estimate={},cached={},getFails=false,writeFails=false,decision={},writable=false,recommendationReadFails=false,recommendationReadHangs=false}={}){
+async function panel(card,{estimate={},cached={},getFails=false,writeFails=false,decision={},writable=false,recommendationReadFails=false,recommendationReadHangs=false,relatedCards=[],dependencyReadFails=false}={}){
   const elements=new Map();
   for(const id of fs.readFileSync(path.join(root,'progress-panel.html'),'utf8').matchAll(/id="([^"]+)"/g))elements.set(id[1],new Element());
   elements.get('content').hidden=true;
   const writes=[];
-  const client={card:async()=>card,cards:async()=>[],render(){},sizeTo:async()=>{},memberCanWriteToModel:()=>writable,
+  const client={card:async()=>card,cards:async()=>{if(dependencyReadFails)throw Error("lookup offline");return relatedCards;},render(){},sizeTo:async()=>{},memberCanWriteToModel:()=>writable,
     get:async(model,visibility,key)=>{if(recommendationReadHangs&&key==='nothing_next_task_decision_v1')return new Promise(()=>{});if(getFails||(recommendationReadFails&&key==='nothing_next_task_decision_v1'))throw Error('unavailable');return key==='nothing_estimates_v1'?estimate:key==='nothing_next_task_decision_v1'?decision:cached},
     set:async(model,visibility,key,value)=>{if(writeFails)throw Error('readonly');writes.push({key,value});if(key==='nothing_next_task_decision_v1')decision=value}};
   const document={body:new Element(),getElementById:id=>{assert.ok(elements.has(id),'Missing element '+id);return elements.get(id)},createElement:()=>new Element(),createTextNode:text=>({textContent:text})};
@@ -98,7 +98,7 @@ test('every supported connector reloads the corrected card panel',()=>{
   const html=fs.readFileSync(path.join(root,'progress-panel.html'),'utf8');
   assert.match(html,/progress-panel\.js\?v=18/);assert.match(html,/dependencies\.js\?v=8/);
   for(const file of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
-    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=21/,file);
+    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=22/,file);
   }
 });
 
@@ -222,4 +222,27 @@ test('references exclude spoofed hosts and non-footer links',async()=>{
  assert.equal(links.length,1);
  assert.equal(links[0].textContent,'Safe');
  assert.equal(links[0].href,'https://github.com/example/project/issues/9');
+});
+
+
+test('missing or unreadable Trello dependencies never appear silently cleared',async()=>{
+ const desc='*Una tarea con dependencia explícita*\n\n**Bloqueo**\nDepende de [Studio 01](https://trello.com/c/CPRnmJFc)\n\n**Siguiente paso**\nEjecutar una prueba aislada';
+ for(const opts of [{relatedCards:[]},{dependencyReadFails:true}]){
+  const p=await panel(card({idList:'6aec66ed3137d17f84ce7a3c',desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}}),opts);
+  assert.equal(p.text('state'),'Dependencias sin verificar');
+  assert.equal(p.text('next'),'Verifica las dependencias antes de empezar.');
+  assert.match(p.node('warning').children[0].textContent,/no ha podido comprobar/);
+  assert.equal(p.writes.length,0);
+ }
+});
+
+test('fully checked predecessor removes uncertain state, but unfinished predecessor remains blocked',async()=>{
+ const desc='*Una tarea dependiente*\n\n**Bloqueo**\nDepende de [Studio 01](https://trello.com/c/CPRnmJFc)\n\n**Siguiente paso**\nProbar una importación';
+ const c=card({idList:'6aec66ed3137d17f84ce7a3c',desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}});
+ const p=await panel(c,{relatedCards:[{shortLink:'CPRnmJFc',name:'Studio 01',idList:'6aec66ed3137d17f84ce7a3c'}]});
+ assert.equal(p.text('state'),'Bloqueada');
+ assert.equal(p.text('next'),'Continuaremos cuando se complete la dependencia.');
+ const ok=await panel(c,{relatedCards:[{shortLink:'CPRnmJFc',name:'Studio 01',idList:'6aec66f2b6df305a261abb0b'}]});
+ assert.equal(ok.text('state'),'Por hacer');
+ assert.equal(ok.text('next'),'Probar una importación');
 });

@@ -199,8 +199,10 @@ function render(card,estimate,dependencies,cached,decision){
  const s=extract(card,estimate||{},cached);
  const finished=card.idList===DONE,progress=s.total?Math.round(s.completed*100/s.total):null;
  const blocked=!finished&&dependencies&&dependencies.blocked;
- setText("state",blocked?"Bloqueada":finished?"Hecho":card.idList===DOING?"En curso":card.idList===TODO?"Por hacer":"En seguimiento");
+ const unknown=!finished&&dependencies&&Boolean(dependencies.unavailable||(dependencies.missing||[]).length);
+ setText("state",blocked?"Bloqueada":unknown?"Dependencias sin verificar":finished?"Hecho":card.idList===DOING?"En curso":card.idList===TODO?"Por hacer":"En seguimiento");
  el("state").classList.toggle("blocked",!!blocked);
+ el("state").classList.toggle("needs-check",!!unknown&&!blocked);
  const blocker=el("blocker");blocker.replaceChildren();
  if(blocked){
   const heading=document.createElement("strong");heading.textContent="Depende de:";
@@ -244,8 +246,9 @@ function render(card,estimate,dependencies,cached,decision){
  });if(s.items.length>12){const li=document.createElement("li");li.className="small";li.textContent="Y "+(s.items.length-12)+" criterios más en la checklist de Trello";list.append(li)}}
  else{const li=document.createElement("li");li.className="muted";li.textContent=s.total?"Hay "+s.total+" criterios; el detalle no está disponible en esta vista.":"Esta tarjeta todavía no tiene checklist.";list.append(li)}
  const next=s.items.find(item=>!item.done);
- setText("next",finished?"Trabajo cerrado. Consulta la descripción y las evidencias de la tarjeta.":blocked?"Continuaremos cuando se complete la dependencia.":explicitNextDecision(card.desc)||(next?next.name:"Revisar la descripción de la tarjeta para elegir el siguiente paso."));
+ setText("next",finished?"Trabajo cerrado. Consulta la descripción y las evidencias de la tarjeta.":blocked?"Continuaremos cuando se complete la dependencia.":unknown?"Verifica las dependencias antes de empezar.":explicitNextDecision(card.desc)||(next?next.name:"Revisar la descripción de la tarjeta para elegir el siguiente paso."));
  const warnings=[];
+ if(unknown)warnings.push("Hay dependencias que Trello no ha podido comprobar. No las consideres resueltas hasta verificar sus tarjetas.");
  if(!finished&&s.total&&s.completed===s.total)warnings.push("Checklist completa, pero la tarjeta todavía no está cerrada.");
  if(!finished&&s.stale)warnings.push("Las horas registradas corresponden a otro progreso. Revisa el resumen de estimación o vuelve a abrir cuando Trello muestre el detalle de las casillas.");
  else if(!finished&&s.remaining===null)warnings.push("Tiempo restante sin calcular: añade horas aproximadas a las tareas de la checklist.");
