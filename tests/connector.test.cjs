@@ -9,10 +9,10 @@ const scripts=Array.from(html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)
 const script=scripts.filter(m=>!m[1].includes('nb-dependencies')).map(m=>m[2]).join('\n');
 const embedded=scripts.find(m=>m[1].includes('nb-dependencies'))[2];
 const TODO='6aec66ed3137d17f84ce7a3c',DONE='6aec66f2b6df305a261abb0b';
-function setup(withDependencies=true){
+function setup(withDependencies=true,href="https://powerup.example/repo/connector.html"){
   let capabilities;
-  const window={TrelloPowerUp:{initialize(value){capabilities=value;}}};
-  const context=vm.createContext({window,Promise,console:{warn(){},error(){}},setTimeout,clearTimeout});
+  const window={location:{href},TrelloPowerUp:{initialize(value){capabilities=value;}}};
+  const context=vm.createContext({window,URL,Promise,console:{warn(){},error(){}},setTimeout,clearTimeout});
   if(withDependencies)vm.runInContext(embedded,context);
   vm.runInContext(script,context);
   return capabilities;
@@ -160,8 +160,8 @@ test('all supported entrypoints show planned and remaining effort, not the obsol
     assert.equal(helper[2].trim(),fs.readFileSync(path.join(root,'dependencies.js'),'utf8').trim());
     const js=parts.filter(part=>!part[1].includes('nb-dependencies')).map(part=>part[2]).join('\n');
     let capabilities;
-    const window={TrelloPowerUp:{initialize(data){capabilities=data}}};
-    const context=vm.createContext({window,Promise,setTimeout,clearTimeout,console:{warn(){},error(){}}});
+    const window={location:{href:"https://powerup.example/repo/"+file},TrelloPowerUp:{initialize(data){capabilities=data}}};
+    const context=vm.createContext({window,URL,Promise,setTimeout,clearTimeout,console:{warn(){},error(){}}});
     vm.runInContext(helper[2],context);
     vm.runInContext(js,context);
     const card={idList:TODO,desc:'',checklists:[{name:'Trabajo',checkItems:[
@@ -204,8 +204,8 @@ test('every historical connector shows estimated hours with only badge counts an
     assert.ok(helper,file+' must include robust time helper');
     const js=parts.filter(part=>!part[1].includes('nb-dependencies')).map(part=>part[2]).join('\n');
     let capabilities;
-    const window={TrelloPowerUp:{initialize(data){capabilities=data}}};
-    const context=vm.createContext({window,Promise,setTimeout,clearTimeout,console:{warn(){},error(){}}});
+    const window={location:{href:"https://powerup.example/repo/"+file},TrelloPowerUp:{initialize(data){capabilities=data}}};
+    const context=vm.createContext({window,URL,Promise,setTimeout,clearTimeout,console:{warn(){},error(){}}});
     vm.runInContext(helper[2],context);
     vm.runInContext(js,context);
     const badge=await capabilities['card-badges'](client({card:async()=>({
@@ -392,4 +392,14 @@ test('uses local list names to resolve dependencies and suppress completed hours
  const done=await cap['card-badges'](client({lists,card:async()=>({idList:'local-done',desc:'*Estimación · ≈ 3 h*',badges:{checkItems:2,checkItemsChecked:2}})}));
  assert.equal(done.length,1);
  assert.match(done[0].text,/100%/);
+});
+
+test('isolated connector uses its own panel, icon and estimator',()=>{
+ const capabilities=setup(true,'https://preview.example/qa/v23/connector.html?preview=1#context');
+ const signed=[];
+ const section=capabilities['card-back-section'](client({signUrl:url=>{signed.push(url);return url}}));
+ assert.deepEqual(signed,['https://preview.example/qa/v23/progress-panel.html?v=23']);
+ assert.equal(section.icon,'https://preview.example/qa/v23/panel-icon.svg');
+ const [estimate]=capabilities['card-buttons'](client());
+ assert.equal(estimate.callback({popup:options=>options.url}),'https://preview.example/qa/v23/estimate.html?v=2');
 });

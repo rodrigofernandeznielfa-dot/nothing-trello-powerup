@@ -290,20 +290,21 @@ root.NBDependencies={workflowState,readBoardLists,readSection,readDependencyIds,
     if(timeText)badges.push({text:timeText,color:"light-gray"});
     return withSignals(badges);
   }
+  function assetUrl(path){return new URL(path,window.location.href).href}
   window.TrelloPowerUp.initialize({
     "card-back-section":function(t){
       return {
         title:"NOTHING · Estado del trabajo",
-        icon:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/panel-icon.svg",
+        icon:assetUrl("panel-icon.svg"),
         content:{
           type:"iframe",
-          url:t.signUrl("https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/progress-panel.html?v=23"),
+          url:t.signUrl(assetUrl("progress-panel.html?v=23")),
           height:355
         }
       };
     },
 
-    "card-buttons":function(t){return [{text:"NOTHING · Estimar criterios",condition:"always",callback:function(ctx){return ctx.popup({title:"Estimaciones de trabajo",url:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/estimate.html?v=2",height:420})}}]},
+    "card-buttons":function(t){return [{text:"NOTHING · Estimar criterios",condition:"always",callback:function(ctx){return ctx.popup({title:"Estimaciones de trabajo",url:assetUrl("estimate.html?v=2"),height:420})}}]},
     "card-badges":async function(t){try{return await getBadges(t)}catch(e){console.error("NOTHING badge",e);return [{text:"NB · ERROR DE LECTURA",color:"red"}]}},
     "card-detail-badges":async function(t){try{var a=await getBadges(t);return a.map(function(x,i){return Object.assign({title:/^(Propuesta|Próxima acordada|Elegida)/.test(x.text)?"Propuesta de siguiente tarea":x.color==="red"||x.color==="orange"?"Dependencias":x.text.indexOf("▰")===0||x.text.indexOf("▱")===0?"Progreso verificado":"Tiempo"},x)})}catch(e){console.error("NOTHING detail",e);return [{title:"NOTHING",text:"Error de lectura · reabrir tarjeta",color:"orange"}]}}
   });
