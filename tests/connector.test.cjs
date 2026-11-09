@@ -54,6 +54,17 @@ test('hanging board lookup leaves dependencies unknown and still returns progres
   assert.equal(b[0].text,'Dependencias sin comprobar');
   assert.match(b[1].text,/0\/5/);
 });
+
+test('unknown dependencies use a yellow warning, never a confirmed red blocker',async()=>{
+ const b=await setup()['card-badges'](client({
+   card:async()=>({idList:TODO,desc:'*Tarea de prueba*\n\n**Bloqueo**\nDepende de [Studio](https://trello.com/c/CPRnmJFc)',badges:{checkItems:1,checkItemsChecked:0}}),
+   cards:async()=>[]
+ }));
+ assert.equal(b[0].text,'Dependencias sin comprobar');
+ assert.equal(b[0].color,'yellow');
+ assert.ok(!b.some(x=>x.color==='red'));
+});
+
 test('known unfinished dependency remains blocked',async()=>{
   const b=await setup()['card-badges'](client({
     card:async()=>({idList:TODO,desc:'NB_DEPENDENCIES_V1: CPRnmJFc',badges:{checkItems:5}}),

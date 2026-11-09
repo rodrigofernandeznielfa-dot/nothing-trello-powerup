@@ -203,7 +203,7 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
       }catch(e){dependencyUnknown=true;console.warn("NOTHING dependency unavailable",e);}
     }
     var blockedBadge=dependencyStatus.blocked?{text:"Bloqueada",color:"red"}
-      :dependencyUnknown && card.idList!==DONE?{text:"Dependencias sin comprobar",color:"orange"}:null;
+      :dependencyUnknown && card.idList!==DONE?{text:"Dependencias sin comprobar",color:"yellow"}:null;
     var suggestion=dependencyReader?dependencyReader.recommendationBadge(card,decision,dependencyStatus.blocked||dependencyUnknown):null;
     function withSignals(badges){
       if(suggestion)badges=[suggestion].concat(badges);
