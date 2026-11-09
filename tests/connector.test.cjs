@@ -9,10 +9,10 @@ const scripts=Array.from(html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)
 const script=scripts.filter(m=>!m[1].includes('nb-dependencies')).map(m=>m[2]).join('\n');
 const embedded=scripts.find(m=>m[1].includes('nb-dependencies'))[2];
 const TODO='6aec66ed3137d17f84ce7a3c',DONE='6aec66f2b6df305a261abb0b';
-function setup(withDependencies=true){
+function setup(withDependencies=true,href="https://powerup.example/repo/connector.html"){
   let capabilities;
-  const window={TrelloPowerUp:{initialize(value){capabilities=value;}}};
-  const context=vm.createContext({window,Promise,console:{warn(){},error(){}},setTimeout,clearTimeout});
+  const window={location:{href},TrelloPowerUp:{initialize(value){capabilities=value;}}};
+  const context=vm.createContext({window,URL,Promise,console:{warn(){},error(){}},setTimeout,clearTimeout});
   if(withDependencies)vm.runInContext(embedded,context);
   vm.runInContext(script,context);
   return capabilities;
@@ -54,6 +54,17 @@ test('hanging board lookup leaves dependencies unknown and still returns progres
   assert.equal(b[0].text,'Dependencias sin comprobar');
   assert.match(b[1].text,/0\/5/);
 });
+
+test('unknown dependencies use a yellow warning, never a confirmed red blocker',async()=>{
+ const b=await setup()['card-badges'](client({
+   card:async()=>({idList:TODO,desc:'*Tarea de prueba*\n\n**Bloqueo**\nDepende de [Studio](https://trello.com/c/CPRnmJFc)',badges:{checkItems:1,checkItemsChecked:0}}),
+   cards:async()=>[]
+ }));
+ assert.equal(b[0].text,'Dependencias sin comprobar');
+ assert.equal(b[0].color,'yellow');
+ assert.ok(!b.some(x=>x.color==='red'));
+});
+
 test('known unfinished dependency remains blocked',async()=>{
   const b=await setup()['card-badges'](client({
     card:async()=>({idList:TODO,desc:'NB_DEPENDENCIES_V1: CPRnmJFc',badges:{checkItems:5}}),
@@ -149,8 +160,8 @@ test('all supported entrypoints show planned and remaining effort, not the obsol
     assert.equal(helper[2].trim(),fs.readFileSync(path.join(root,'dependencies.js'),'utf8').trim());
     const js=parts.filter(part=>!part[1].includes('nb-dependencies')).map(part=>part[2]).join('\n');
     let capabilities;
-    const window={TrelloPowerUp:{initialize(data){capabilities=data}}};
-    const context=vm.createContext({window,Promise,setTimeout,clearTimeout,console:{warn(){},error(){}}});
+    const window={location:{href:"https://powerup.example/repo/"+file},TrelloPowerUp:{initialize(data){capabilities=data}}};
+    const context=vm.createContext({window,URL,Promise,setTimeout,clearTimeout,console:{warn(){},error(){}}});
     vm.runInContext(helper[2],context);
     vm.runInContext(js,context);
     const card={idList:TODO,desc:'',checklists:[{name:'Trabajo',checkItems:[
@@ -193,8 +204,8 @@ test('every historical connector shows estimated hours with only badge counts an
     assert.ok(helper,file+' must include robust time helper');
     const js=parts.filter(part=>!part[1].includes('nb-dependencies')).map(part=>part[2]).join('\n');
     let capabilities;
-    const window={TrelloPowerUp:{initialize(data){capabilities=data}}};
-    const context=vm.createContext({window,Promise,setTimeout,clearTimeout,console:{warn(){},error(){}}});
+    const window={location:{href:"https://powerup.example/repo/"+file},TrelloPowerUp:{initialize(data){capabilities=data}}};
+    const context=vm.createContext({window,URL,Promise,setTimeout,clearTimeout,console:{warn(){},error(){}}});
     vm.runInContext(helper[2],context);
     vm.runInContext(js,context);
     const badge=await capabilities['card-badges'](client({card:async()=>({
@@ -292,4 +303,103 @@ test('native-first compact cards expose their meta and only explicit dependencie
  assert.deepEqual(plain(helper.readDependencyIds(blocked)),['CPRnmJFc','tKMRgTQQ']);
  const unrelated='🎯 **META** · Puente\n🧱 **BLOQUEO** · Validación pendiente\n📁 **EXPEDIENTE** · [Studio 01](https://trello.com/c/CPRnmJFc)';
  assert.deepEqual(plain(helper.readDependencyIds(unrelated)),[]);
+});
+
+
+test('editorial 3S v3 renders italic lead and multiline blocker without collecting reference links',()=>{
+ const ctx=vm.createContext({window:{}});
+ vm.runInContext(fs.readFileSync(path.join(root,'dependencies.js'),'utf8'),ctx);
+ const helper=ctx.window.NBDependencies;
+ const desc='*Puente seguro entre Studio y Godot*\n\n**Bloqueo**\nDepende de [Studio 01](https://trello.com/c/CPRnmJFc) · [Studio 02](https://trello.com/c/tKMRgTQQ)\n\n**Siguiente paso**\nProbar una importación ficticia\n\n---\n\n*Referencias · [No es dependencia](https://trello.com/c/GUKFRrxj)*';
+ assert.equal(helper.readPreview(desc),'Puente seguro entre Studio y Godot');
+ assert.deepEqual(plain(helper.readDependencyIds(desc)),['CPRnmJFc','tKMRgTQQ']);
+ const state=helper.resolve(desc,[
+  {shortLink:'CPRnmJFc',idList:TODO,name:'Studio 01'},
+  {shortLink:'tKMRgTQQ',idList:DONE,name:'Studio 02'}
+ ],DONE);
+ assert.equal(state.blocked,true);
+ assert.deepEqual(plain(state.dependencies.map(x=>x.id)),['CPRnmJFc']);
+ assert.deepEqual(plain(state.missing),[]);
+ assert.ok(!helper.readSection(desc,'Bloqueo').includes('Referencias'));
+});
+
+test('editorial references, rough estimates and ordinary blockers never invent dependencies or hours',()=>{
+ const ctx=vm.createContext({window:{}});
+ vm.runInContext(fs.readFileSync(path.join(root,'dependencies.js'),'utf8'),ctx);
+ const helper=ctx.window.NBDependencies;
+ const desc='*Prueba aislada de exportación*\n\n**Bloqueo**\nValidación en Windows pendiente\n\n*Estimación previa · ≈11 h orientativas*\n\n---\n\n*Referencias · [Studio 01](https://trello.com/c/CPRnmJFc)*';
+ assert.equal(helper.readPreview(desc),'Prueba aislada de exportación');
+ assert.deepEqual(plain(helper.readDependencyIds(desc)),[]);
+ assert.equal(helper.readTimeSummary(desc),null);
+ const old='🎯 **META** · Puente reversible\n🧱 **BLOQUEO** · Depende de [Studio](https://trello.com/c/CPRnmJFc)';
+ assert.equal(helper.readPreview(old),'Puente reversible');
+ assert.deepEqual(plain(helper.readDependencyIds(old)),['CPRnmJFc']);
+});
+
+test('editorial multiline dependency remains red on the card and each legacy connector',async()=>{
+ const desc='*Editor de NPC*\n\n**Bloqueo**\nDepende de [Studio](https://trello.com/c/CPRnmJFc)\n\n---\n\n*Referencias · [Another unrelated card](https://trello.com/c/GUKFRrxj)*';
+ const c=setup();
+ const badges=await c['card-badges'](client({
+   card:async()=>({idList:TODO,desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}}),
+   cards:async()=>[{shortLink:'CPRnmJFc',name:'Studio',idList:TODO}]
+ }));
+ assert.equal(badges[0]?.color,'red');
+ for(const name of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
+  const code=fs.readFileSync(path.join(root,name),'utf8');
+  assert.match(code,/progress-panel\.html\?v=23/,name);
+  assert.match(code,/readSection\(source,"Bloqueo"\)/,name);
+ }
+});
+
+
+test('editorial rough hours appear as orientation only, never as calculated pending time',async()=>{
+ const desc='*Un editor de personajes práctico*\n\n**Siguiente paso**\nProbar exportación\n\n*Estimación previa · ≈11 h (orientativa)*';
+ const cap=setup();
+ const empty=await cap['card-badges'](client({card:async()=>({idList:TODO,desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}})}));
+ assert.deepEqual(plain(empty),[{text:'⏱ ≈ 11 h orientativas',color:'light-gray'}]);
+ const counted=await cap['card-badges'](client({card:async()=>({idList:TODO,desc,checklists:[],badges:{checkItems:4,checkItemsChecked:2}})}));
+ assert.match(counted[0].text,/50%/);
+ assert.equal(counted[1].text,'⏱ ≈ 11 h orientativas');
+ assert.ok(!counted[1].text.includes('quedan'));
+ const finished=await cap['card-badges'](client({card:async()=>({idList:DONE,desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}})}));
+ assert.equal(finished.length,0);
+});
+
+test('explicit native effort beats rough editorial estimate, and prior historical ranges are not treated as totals',async()=>{
+ const desc='*Actividad de desarrollo*\n\n*Estimación · ≈19,5 h orientativas*';
+ const cap=setup();
+ const native=await cap['card-badges'](client({card:async()=>({idList:TODO,desc,checklists:[{checkItems:[
+  {id:'a',name:'Trabajo uno · ≈ 2 h',state:'complete'},
+  {id:'b',name:'Trabajo dos · ≈ 3 h',state:'incomplete'}
+ ]}],badges:{checkItems:2,checkItemsChecked:1}})}));
+ assert.equal(native[1].text,'⏱ ≈ 5 h prev. · 3 h quedan');
+ const historical=await cap['card-badges'](client({card:async()=>({idList:TODO,desc:'*Estimación original · 3–6 h; no medida.*',checklists:[],badges:{checkItems:0,checkItemsChecked:0}})}));
+ assert.equal(historical.length,0);
+});
+
+test('uses local list names to resolve dependencies and suppress completed hours',async()=>{
+ const lists=async(...fields)=>{
+  assert.deepEqual(fields,['id','name']);
+  return [{id:'local-todo',name:'📋 POR HACER'},{id:'local-done',name:'✅ HECHO'}];
+ };
+ const card=async()=>({idList:'local-todo',desc:'**Bloqueo** · Depende de [Tarea](https://trello.com/c/CPRnmJFc)',badges:{checkItems:2,checkItemsChecked:1}});
+ const cards=async()=>[{shortLink:'CPRnmJFc',idList:'local-done'}];
+ const cap=setup();
+ const ready=await cap['card-badges'](client({lists,card,cards}));
+ assert.match(ready[0].text,/50%/);
+ const unknown=await cap['card-badges'](client({lists:never,card,cards}));
+ assert.equal(unknown[0].text,'Dependencias sin comprobar');
+ const done=await cap['card-badges'](client({lists,card:async()=>({idList:'local-done',desc:'*Estimación · ≈ 3 h*',badges:{checkItems:2,checkItemsChecked:2}})}));
+ assert.equal(done.length,1);
+ assert.match(done[0].text,/100%/);
+});
+
+test('isolated connector uses its own panel, icon and estimator',()=>{
+ const capabilities=setup(true,'https://preview.example/qa/v23/connector.html?preview=1#context');
+ const signed=[];
+ const section=capabilities['card-back-section'](client({signUrl:url=>{signed.push(url);return url}}));
+ assert.deepEqual(signed,['https://preview.example/qa/v23/progress-panel.html?v=23']);
+ assert.equal(section.icon,'https://preview.example/qa/v23/panel-icon.svg');
+ const [estimate]=capabilities['card-buttons'](client());
+ assert.equal(estimate.callback({popup:options=>options.url}),'https://preview.example/qa/v23/estimate.html?v=2');
 });

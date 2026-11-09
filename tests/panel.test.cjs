@@ -14,18 +14,18 @@ class Element{
   addEventListener(name,callback){this.events[name]=callback;}
   setAttribute(){}
 }
-async function panel(card,{estimate={},cached={},getFails=false,writeFails=false,decision={},writable=false,recommendationReadFails=false,recommendationReadHangs=false}={}){
+async function panel(card,{estimate={},cached={},getFails=false,writeFails=false,decision={},writable=false,recommendationReadFails=false,recommendationReadHangs=false,relatedCards=[],boardLists=[],dependencyReadFails=false}={}){
   const elements=new Map();
   for(const id of fs.readFileSync(path.join(root,'progress-panel.html'),'utf8').matchAll(/id="([^"]+)"/g))elements.set(id[1],new Element());
   elements.get('content').hidden=true;
   const writes=[];
-  const client={card:async()=>card,cards:async()=>[],render(){},sizeTo:async()=>{},memberCanWriteToModel:()=>writable,
+  const client={card:async()=>card,lists:async()=>boardLists,cards:async()=>{if(dependencyReadFails)throw Error("lookup offline");return relatedCards;},render(){},sizeTo:async()=>{},memberCanWriteToModel:()=>writable,
     get:async(model,visibility,key)=>{if(recommendationReadHangs&&key==='nothing_next_task_decision_v1')return new Promise(()=>{});if(getFails||(recommendationReadFails&&key==='nothing_next_task_decision_v1'))throw Error('unavailable');return key==='nothing_estimates_v1'?estimate:key==='nothing_next_task_decision_v1'?decision:cached},
     set:async(model,visibility,key,value)=>{if(writeFails)throw Error('readonly');writes.push({key,value});if(key==='nothing_next_task_decision_v1')decision=value}};
   const document={body:new Element(),getElementById:id=>{assert.ok(elements.has(id),'Missing element '+id);return elements.get(id)},createElement:()=>new Element(),createTextNode:text=>({textContent:text})};
   const timers=new Set();
   const window={TrelloPowerUp:{iframe:()=>client},setTimeout:(fn,ms)=>{const id=setTimeout(fn,ms);timers.add(id);return id},clearTimeout:id=>{clearTimeout(id);timers.delete(id)}};
-  const context=vm.createContext({window,document,console:{warn(){},error(){}}});
+  const context=vm.createContext({window,document,setTimeout:window.setTimeout,clearTimeout:window.clearTimeout,console:{warn(){},error(){}}});
   vm.runInContext(fs.readFileSync(path.join(root,'dependencies.js'),'utf8'),context);
   vm.runInContext(fs.readFileSync(path.join(root,'progress-panel.js'),'utf8'),context);
   try{
@@ -96,9 +96,9 @@ test('zero remaining/completed estimates are valid and readonly cache errors do 
 });
 test('every supported connector reloads the corrected card panel',()=>{
   const html=fs.readFileSync(path.join(root,'progress-panel.html'),'utf8');
-  assert.match(html,/progress-panel\.js\?v=16/);assert.match(html,/dependencies\.js\?v=6/);
+  assert.match(html,/progress-panel\.js\?v=19/);assert.match(html,/dependencies\.js\?v=9/);
   for(const file of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
-    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=16/,file);
+    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=23/,file);
   }
 });
 
@@ -180,4 +180,84 @@ test('compact cards keep their native next step instead of a generic fallback',a
  const p=await panel(card({desc}));
  assert.equal(p.text('next'),'Probar un lote pequeño de prueba');
  assert.equal(p.text('state'),'En curso');
+});
+
+
+test('editorial 3S v3 retains the actual next step and labels rough hours honestly',async()=>{
+ const desc='*Estudio sencillo y visual*\n\n**Situación actual**\nPrototipo pendiente de validar\n\n**Siguiente paso**\nProbar fichas, búsqueda y exportación en Windows\n\n*Estimación previa · ≈11 h orientativas*\n\n---\n\n*Referencias · [Archivo](https://github.com/example/test/issues/1)*';
+ const p=await panel(card({desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}}));
+ assert.equal(p.text('next'),'Probar fichas, búsqueda y exportación en Windows');
+ assert.equal(p.text('planned'),'≈ 11 h');
+ assert.match(p.text('plannedCaption'),/orientativa/i);
+ assert.equal(p.text('remaining'),'Sin estimar');
+});
+
+
+test('editorial rough estimate appears only as orientation, with unknown remaining work',async()=>{
+ const desc='*Primer prototipo del catálogo*\n\n**Siguiente paso**\nRevisar navegación\n\n*Estimación · ≈ 11 h (orientativa)*';
+ const p=await panel(card({desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}}));
+ assert.equal(p.text('planned'),'≈ 11 h');
+ assert.match(p.text('plannedCaption'),/orientativa/i);
+ assert.equal(p.text('remaining'),'Sin estimar');
+ assert.match(p.text('remainCaption'),/no calcula trabajo restante/i);
+ assert.equal(p.text('spent'),'Sin estimar');
+});
+
+
+test('editorial reference footer produces safe, named links without catalog entries',async()=>{
+ const desc='*Vista sencilla del laboratorio*\n\n**Siguiente paso**\nProbar la exportación\n\n---\n\n*Referencias · [Issue #77](https://github.com/example/project/issues/77) · [Studio 01](https://trello.com/c/CPRnmJFc)*';
+ const p=await panel(card({desc,badges:{checkItems:0,checkItemsChecked:0}}));
+ assert.equal(p.node('references').hidden,false);
+ const links=p.node('reference-links').children;
+ assert.equal(links.length,2);
+ assert.deepEqual(links.map(link=>link.textContent),['Issue #77','Studio 01']);
+ assert.deepEqual(links.map(link=>link.href),['https://github.com/example/project/issues/77','https://trello.com/c/CPRnmJFc']);
+ assert.equal(p.writes.length,0);
+});
+
+test('references exclude spoofed hosts and non-footer links',async()=>{
+ const desc='*Laboratorio seguro*\n\n**Bloqueo**\nNo existe bloqueo\n\n**Siguiente paso**\nAbrir documentación pública https://github.com/example/other\n\n---\n\n*Referencias · [Evil](https://github.com.evil.invalid/secret) · [Another Evil](https://trello.com.evil.invalid/c/ABCDEFGH) · [Safe](https://github.com/example/project/issues/9) · [Dup](https://github.com/example/project/issues/9)*';
+ const p=await panel(card({desc,badges:{checkItems:0,checkItemsChecked:0}}));
+ const links=p.node('reference-links').children;
+ assert.equal(links.length,1);
+ assert.equal(links[0].textContent,'Safe');
+ assert.equal(links[0].href,'https://github.com/example/project/issues/9');
+});
+
+
+test('missing or unreadable Trello dependencies never appear silently cleared',async()=>{
+ const desc='*Una tarea con dependencia explícita*\n\n**Bloqueo**\nDepende de [Studio 01](https://trello.com/c/CPRnmJFc)\n\n**Siguiente paso**\nEjecutar una prueba aislada';
+ for(const opts of [{relatedCards:[]},{dependencyReadFails:true}]){
+  const p=await panel(card({idList:'6aec66ed3137d17f84ce7a3c',desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}}),opts);
+  assert.equal(p.text('state'),'Dependencias sin verificar');
+  assert.equal(p.text('next'),'Verifica las dependencias antes de empezar.');
+  assert.match(p.node('warning').children[0].textContent,/no ha podido comprobar/);
+  assert.equal(p.writes.length,0);
+ }
+});
+
+test('fully checked predecessor removes uncertain state, but unfinished predecessor remains blocked',async()=>{
+ const desc='*Una tarea dependiente*\n\n**Bloqueo**\nDepende de [Studio 01](https://trello.com/c/CPRnmJFc)\n\n**Siguiente paso**\nProbar una importación';
+ const c=card({idList:'6aec66ed3137d17f84ce7a3c',desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}});
+ const p=await panel(c,{relatedCards:[{shortLink:'CPRnmJFc',name:'Studio 01',idList:'6aec66ed3137d17f84ce7a3c'}]});
+ assert.equal(p.text('state'),'Bloqueada');
+ assert.equal(p.text('next'),'Continuaremos cuando se complete la dependencia.');
+ const ok=await panel(c,{relatedCards:[{shortLink:'CPRnmJFc',name:'Studio 01',idList:'6aec66f2b6df305a261abb0b'}]});
+ assert.equal(ok.text('state'),'Por hacer');
+ assert.equal(ok.text('next'),'Probar una importación');
+});
+
+test('shows the current board workflow and rechecks eligibility when saving a proposal',async()=>{
+ const boardLists=[{id:'local-todo',name:'📋 POR HACER'},{id:'local-doing',name:'🛠️ EN CURSO'},{id:'local-done',name:'✅ HECHO'}];
+ const fixture={...proposalCard(),idList:'local-todo'};
+ const p=await panel(fixture,{boardLists,writable:true});
+ assert.equal(p.text('state'),'Por hacer');
+ assert.equal(p.node('recommendation').hidden,false);
+ fixture.idList='local-doing';
+ await p.click('recommendation-accept');
+ assert.match(p.text('recommendation-status'),/ha cambiado/);
+ assert.equal(p.writes.length,0);
+ const done=await panel(card({idList:'local-done'}),{boardLists});
+ assert.equal(done.text('state'),'Hecho');
+ assert.equal(done.text('remaining'),'0 h');
 });
