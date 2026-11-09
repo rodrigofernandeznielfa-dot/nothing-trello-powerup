@@ -63,13 +63,19 @@ const evidence=process.env.NB_PANEL_EVIDENCE_DIR||path.join(root,'evidence');
    assert.equal(await page.locator('#planned').textContent(),'≈ 11 h');
    assert.equal(await page.locator('#remaining').textContent(),'Sin estimar');
    assert.match(await page.locator('#plannedCaption').textContent(),/orientativa/);
-   assert.equal(await page.locator('#next').textContent(),'Validar una importación aislada');
+   assert.equal(await page.locator('#next').textContent(),'Continuaremos cuando se complete la dependencia.');
    assert.equal(await page.locator('#references a').count(),2);
    assert.deepEqual(await page.locator('#references a').allTextContents(),['Issue #77','Fuente']);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Editorial layout overflows '+width+'px');
    await page.screenshot({path:path.join(evidence,'editorial-v3-'+width+'.png'),fullPage:true});
   }
-  console.log('BROWSER_EDITORIAL_V3_OK: blocked dependencies, rough hours, sources and next step at 320/620px');
+  // The human-authored next action must reappear after the dependency is completed.
+  await page.evaluate(async()=>{window.relatedCards[0].idList='6aec66f2b6df305a261abb0b';await window.refreshPanel()});
+  assert.equal(await page.locator('#state').textContent(),'Por hacer');
+  assert.equal(await page.locator('#next').textContent(),'Validar una importación aislada');
+  assert.equal(await page.locator('#remaining').textContent(),'Sin estimar');
+  await page.screenshot({path:path.join(evidence,'editorial-unblocked.png'),fullPage:true});
+  console.log('BROWSER_EDITORIAL_V3_OK: blocked/unblocked, rough hours, sources and next step at 320/620px');
   assert.deepEqual(errors,[]);
   console.log('BROWSER_PANEL_TEST_OK: 9/36, missing details, mobile/desktop layout, 2-hour decrement verified');
  }finally{await browser.close()}
