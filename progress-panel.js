@@ -132,8 +132,20 @@ function addHoverPreview(link,card){
 function cardReferences(card){
  const id=String(card.id||"");
  const items=window.NBReferenceCatalog&&window.NBReferenceCatalog[id];
- if(!Array.isArray(items))return [];
- return items.filter(ref=>ref&&/^https:\/\/(?:github\.com|trello\.com)\//.test(ref.url)&&ref.label&&ref.summary).slice(0,5).map(ref=>({...ref,host:ref.url.includes("github.com")?"github.com":"trello.com"}));
+ const allowed=url=>typeof url==="string"&&/^https:\/\/(?:github\.com|trello\.com)\/[A-Za-z0-9._~/%?#=&+:-]+$/.test(url);
+ const catalog=Array.isArray(items)?items.filter(ref=>ref&&allowed(ref.url)&&ref.label&&ref.summary):[];
+ // Editorial 3S v3 keeps the canonical links in a dedicated Markdown footer.
+ // Only that footer is parsed; never turn incidental links into references.
+ const footer=String(card.desc||"").replace(/\r/g,"").split("\n")
+   .map(line=>line.trim()).find(line=>/^\*?Referencias\s*·\s*/i.test(line))||"";
+ const editorial=Array.from(footer.slice(0,2500).matchAll(/\[([^\]\n]{1,75})\]\((https:\/\/(?:github\.com|trello\.com)\/[^)\s<>"']{1,500})\)/g),
+   match=>({label:match[1].trim(),url:match[2],summary:"Referencia incluida en la descripción de la tarjeta"}))
+   .filter(ref=>ref.label&&allowed(ref.url));
+ const seen=new Set();
+ return [...catalog,...editorial].filter(ref=>{
+   if(seen.has(ref.url))return false;
+   seen.add(ref.url);return true;
+ }).slice(0,5).map(ref=>({...ref,host:ref.url.startsWith("https://github.com/")?"github.com":"trello.com"}));
 }
 function addReferenceHover(link,ref){
  const popup=el("dependency-preview");

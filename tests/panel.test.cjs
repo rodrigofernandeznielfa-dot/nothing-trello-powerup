@@ -96,9 +96,9 @@ test('zero remaining/completed estimates are valid and readonly cache errors do 
 });
 test('every supported connector reloads the corrected card panel',()=>{
   const html=fs.readFileSync(path.join(root,'progress-panel.html'),'utf8');
-  assert.match(html,/progress-panel\.js\?v=17/);assert.match(html,/dependencies\.js\?v=8/);
+  assert.match(html,/progress-panel\.js\?v=18/);assert.match(html,/dependencies\.js\?v=8/);
   for(const file of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
-    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=18/,file);
+    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=19/,file);
   }
 });
 
@@ -201,4 +201,25 @@ test('editorial rough estimate appears only as orientation, with unknown remaini
  assert.equal(p.text('remaining'),'Sin estimar');
  assert.match(p.text('remainCaption'),/no calcula trabajo restante/i);
  assert.equal(p.text('spent'),'Sin estimar');
+});
+
+
+test('editorial reference footer produces safe, named links without catalog entries',async()=>{
+ const desc='*Vista sencilla del laboratorio*\n\n**Siguiente paso**\nProbar la exportación\n\n---\n\n*Referencias · [Issue #77](https://github.com/example/project/issues/77) · [Studio 01](https://trello.com/c/CPRnmJFc)*';
+ const p=await panel(card({desc,badges:{checkItems:0,checkItemsChecked:0}}));
+ assert.equal(p.node('references').hidden,false);
+ const links=p.node('reference-links').children;
+ assert.equal(links.length,2);
+ assert.deepEqual(links.map(link=>link.textContent),['Issue #77','Studio 01']);
+ assert.deepEqual(links.map(link=>link.href),['https://github.com/example/project/issues/77','https://trello.com/c/CPRnmJFc']);
+ assert.equal(p.writes.length,0);
+});
+
+test('references exclude spoofed hosts and non-footer links',async()=>{
+ const desc='*Laboratorio seguro*\n\n**Bloqueo**\nNo existe bloqueo\n\n**Siguiente paso**\nAbrir documentación pública https://github.com/example/other\n\n---\n\n*Referencias · [Evil](https://github.com.evil.invalid/secret) · [Another Evil](https://trello.com.evil.invalid/c/ABCDEFGH) · [Safe](https://github.com/example/project/issues/9) · [Dup](https://github.com/example/project/issues/9)*';
+ const p=await panel(card({desc,badges:{checkItems:0,checkItemsChecked:0}}));
+ const links=p.node('reference-links').children;
+ assert.equal(links.length,1);
+ assert.equal(links[0].textContent,'Safe');
+ assert.equal(links[0].href,'https://github.com/example/project/issues/9');
 });
