@@ -211,15 +211,16 @@ function render(card,estimate,dependencies,cached,decision){
  const bar=el("track");bar.replaceChildren();
  if(s.total){for(let i=0;i<Math.min(s.total,20);i++){const seg=document.createElement("span");seg.className="segment"+(i<Math.round((s.completed/s.total)*Math.min(s.total,20))?" done":"");bar.append(seg)}}
  const historical=historic(card.desc);
+ const editorial=window.NBDependencies.readEditorialEstimate(card.desc);
  const partial=window.NBDependencies.hasUnestimatedCompleted(s.plan,s.completed);
- setText("planned",partial?"Sin cerrar":s.plan?"≈ "+asHours(s.plan.planned):finished?"Sin estimación inicial":"Sin estimar");
- setText("plannedCaption",partial?"Falta estimar trabajo ya completado":s.plan?s.source==="summary"?"Estimación registrada en la tarjeta":s.source==="snapshot"?"Estimación guardada para este progreso":"Estimación total de los criterios con horas":"No hay un plan de horas registrado");
+ setText("planned",partial?"Sin cerrar":s.plan?"≈ "+asHours(s.plan.planned):finished?"Sin estimación inicial":editorial?"≈ "+asHours(editorial.hours):"Sin estimar");
+ setText("plannedCaption",partial?"Falta estimar trabajo ya completado":s.plan?s.source==="summary"?"Estimación registrada en la tarjeta":s.source==="snapshot"?"Estimación guardada para este progreso":"Estimación total de los criterios con horas":!finished&&editorial?"Estimación orientativa sin desglose; no son horas medidas":"No hay un plan de horas registrado");
  const completedEffort=s.plan&&!s.stale?Math.round((s.plan.planned-s.plan.remaining)*10)/10:null;
  setText("spentLabel",historical?"Dedicación":"Completado");
  setText("spent",historical||(completedEffort!==null&&(!partial||completedEffort>0)?"≈ "+asHours(completedEffort):"Sin estimar"));
  setText("spentCaption",historical?"Dedicación retrospectiva, no cronometrada":partial?completedEffort>0?"Solo tareas con horas; quedan avances previos sin estimar":"Los avances previos no tienen horas asignadas":completedEffort!==null?"Esfuerzo estimado de las tareas completadas; no cronometrado":"Sin estimación verificable del trabajo completado");
  setText("remaining",finished?"0 h":s.stale?"Revisar estimación":s.remaining===null?"Sin estimar":"≈ "+asHours(s.remaining));
- setText("remainCaption",finished?"Tarjeta cerrada":s.stale?"El resumen no coincide con el progreso actual":s.remaining===null?"Faltan estimaciones por criterio":partial?"Estimación del trabajo pendiente con horas":"Se descuentan las tareas marcadas como completadas");
+ setText("remainCaption",finished?"Tarjeta cerrada":s.stale?"El resumen no coincide con el progreso actual":s.remaining===null&&editorial?"La referencia anterior no calcula trabajo restante":s.remaining===null?"Faltan estimaciones por criterio":partial?"Estimación del trabajo pendiente con horas":"Se descuentan las tareas marcadas como completadas");
  const list=el("steps");list.replaceChildren();
  if(s.hasDetailedItems){s.items.slice(0,12).forEach(item=>{
    const li=document.createElement("li"),mark=document.createElement("span"),text=document.createElement("span");

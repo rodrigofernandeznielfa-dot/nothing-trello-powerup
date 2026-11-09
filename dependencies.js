@@ -59,6 +59,14 @@ function readPreview(desc){
  if(/^\*\*[^*]+\*\*$/.test((parts[0]||"").trim()))return (parts[1]||"").trim();
  return "";
 }
+// One human-authored editorial estimate is a rough reference only.
+// It is not a measured total or a calculation of work remaining.
+function readEditorialEstimate(desc){
+ const match=String(desc||"").replace(/\r/g,"").match(/^\*Estimaci[oó]n(?:\s+previa)?\s*·\s*≈\s*(\d+(?:[.,]\d+)?)\s*h\b[^\n*]*\*$/im);
+ if(!match)return null;
+ const hours=Number(match[1].replace(",","."));
+ return Number.isFinite(hours)&&hours>=0&&hours<=999?{hours}:null;
+}
 function readCriterionHours(name){
  // Editable, visible work estimate on a native Trello check item:
  // "Revisar el diseño · ≈ 2,5 h". No other numbers are treated as hours.
@@ -153,5 +161,5 @@ function resolve(desc,cards,doneListId){
  }
  return {blocked:unresolved.length>0,dependencies:unresolved,missing};
 }
-root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan,readTimeSummary,hasUnestimatedCompleted,readRecommendation,recommendationFor,recommendationBadge};
+root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readEditorialEstimate,readCriterionHours,readTimePlan,readTimeSummary,hasUnestimatedCompleted,readRecommendation,recommendationFor,recommendationBadge};
 })(typeof window!=="undefined"?window:globalThis);

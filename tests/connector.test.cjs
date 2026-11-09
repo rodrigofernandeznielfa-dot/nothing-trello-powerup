@@ -335,7 +335,33 @@ test('editorial multiline dependency remains red on the card and each legacy con
  assert.equal(badges[0]?.color,'red');
  for(const name of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
   const code=fs.readFileSync(path.join(root,name),'utf8');
-  assert.match(code,/progress-panel\.html\?v=17/,name);
+  assert.match(code,/progress-panel\.html\?v=18/,name);
   assert.match(code,/readSection\(source,"Bloqueo"\)/,name);
  }
+});
+
+
+test('editorial rough hours appear as orientation only, never as calculated pending time',async()=>{
+ const desc='*Un editor de personajes práctico*\n\n**Siguiente paso**\nProbar exportación\n\n*Estimación previa · ≈11 h (orientativa)*';
+ const cap=setup();
+ const empty=await cap['card-badges'](client({card:async()=>({idList:TODO,desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}})}));
+ assert.deepEqual(plain(empty),[{text:'⏱ ≈ 11 h orientativas',color:'light-gray'}]);
+ const counted=await cap['card-badges'](client({card:async()=>({idList:TODO,desc,checklists:[],badges:{checkItems:4,checkItemsChecked:2}})}));
+ assert.match(counted[0].text,/50%/);
+ assert.equal(counted[1].text,'⏱ ≈ 11 h orientativas');
+ assert.ok(!counted[1].text.includes('quedan'));
+ const finished=await cap['card-badges'](client({card:async()=>({idList:DONE,desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}})}));
+ assert.equal(finished.length,0);
+});
+
+test('explicit native effort beats rough editorial estimate, and prior historical ranges are not treated as totals',async()=>{
+ const desc='*Actividad de desarrollo*\n\n*Estimación · ≈19,5 h orientativas*';
+ const cap=setup();
+ const native=await cap['card-badges'](client({card:async()=>({idList:TODO,desc,checklists:[{checkItems:[
+  {id:'a',name:'Trabajo uno · ≈ 2 h',state:'complete'},
+  {id:'b',name:'Trabajo dos · ≈ 3 h',state:'incomplete'}
+ ]}],badges:{checkItems:2,checkItemsChecked:1}})}));
+ assert.equal(native[1].text,'⏱ ≈ 5 h prev. · 3 h quedan');
+ const historical=await cap['card-badges'](client({card:async()=>({idList:TODO,desc:'*Estimación original · 3–6 h; no medida.*',checklists:[],badges:{checkItems:0,checkItemsChecked:0}})}));
+ assert.equal(historical.length,0);
 });

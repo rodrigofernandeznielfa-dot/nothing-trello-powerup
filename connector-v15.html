@@ -66,6 +66,14 @@ function readPreview(desc){
  if(/^\*\*[^*]+\*\*$/.test((parts[0]||"").trim()))return (parts[1]||"").trim();
  return "";
 }
+// One human-authored editorial estimate is a rough reference only.
+// It is not a measured total or a calculation of work remaining.
+function readEditorialEstimate(desc){
+ const match=String(desc||"").replace(/\r/g,"").match(/^\*Estimaci[oó]n(?:\s+previa)?\s*·\s*≈\s*(\d+(?:[.,]\d+)?)\s*h\b[^\n*]*\*$/im);
+ if(!match)return null;
+ const hours=Number(match[1].replace(",","."));
+ return Number.isFinite(hours)&&hours>=0&&hours<=999?{hours}:null;
+}
 function readCriterionHours(name){
  // Editable, visible work estimate on a native Trello check item:
  // "Revisar el diseño · ≈ 2,5 h". No other numbers are treated as hours.
@@ -160,7 +168,7 @@ function resolve(desc,cards,doneListId){
  }
  return {blocked:unresolved.length>0,dependencies:unresolved,missing};
 }
-root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readCriterionHours,readTimePlan,readTimeSummary,hasUnestimatedCompleted,readRecommendation,recommendationFor,recommendationBadge};
+root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,readPreview,readEditorialEstimate,readCriterionHours,readTimePlan,readTimeSummary,hasUnestimatedCompleted,readRecommendation,recommendationFor,recommendationBadge};
 })(typeof window!=="undefined"?window:globalThis);
 </script>
 <script>
@@ -206,10 +214,13 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
     var nativeTotal=Number(native.checkItems)||0;
     var nativeDone=Number(native.checkItemsChecked)||0;
     var historic=dependencyReader?dependencyReader.readHistoricHours(card.desc):null;
+    var editorial=dependencyReader?dependencyReader.readEditorialEstimate(card.desc):null;
     var historicText=historic?(historic.min===historic.max?"≈ "+historic.min+" h":"≈ "+historic.min+"–"+historic.max+" h"):null;
     if(!items.length && !nativeTotal){
       var onlyTime=card.idList===DONE && historic?
-        [{text:"⏱ "+String(historic.min).replace(".",",")+(historic.max!==historic.min?"–"+String(historic.max).replace(".",","):"")+" h",color:"light-gray"}]:[];
+        [{text:"⏱ "+String(historic.min).replace(".",",")+(historic.max!==historic.min?"–"+String(historic.max).replace(".",","):"")+" h",color:"light-gray"}]
+        :card.idList!==DONE && editorial?
+        [{text:"⏱ ≈ "+String(editorial.hours).replace(".",",")+" h orientativas",color:"light-gray"}]:[];
       return withSignals(onlyTime);
     }
     var plan=dependencyReader?dependencyReader.readTimePlan(card.checklists||[],estimates):null;
@@ -242,7 +253,8 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
        ?"⏱ ≈ "+fmtHour(effective.planned)+" h prev. · revisar pendiente"
        :dependencyReader.hasUnestimatedCompleted(effective,nativeDone)?"⏱ ≈ "+fmtHour(effective.remaining)+" h quedan · total sin cerrar"
        :"⏱ ≈ "+fmtHour(effective.planned)+" h prev. · "+fmtHour(effective.remaining)+" h quedan")
-       :hours===null?"⏱ Sin estimar":"⏱ "+Math.round(hours*10)/10+" h pendientes");
+       :hours!==null?"⏱ "+fmtHour(hours)+" h pendientes"
+       :editorial?"⏱ ≈ "+fmtHour(editorial.hours)+" h orientativas":"⏱ Sin estimar");
     var badges=[
       {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")",color:percent===100?"green":"blue"}
     ];
@@ -256,7 +268,7 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
         icon:"https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/panel-icon.svg",
         content:{
           type:"iframe",
-          url:t.signUrl("https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/progress-panel.html?v=17"),
+          url:t.signUrl("https://rodrigofernandeznielfa-dot.github.io/nothing-trello-powerup/progress-panel.html?v=18"),
           height:355
         }
       };

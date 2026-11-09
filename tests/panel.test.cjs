@@ -96,9 +96,9 @@ test('zero remaining/completed estimates are valid and readonly cache errors do 
 });
 test('every supported connector reloads the corrected card panel',()=>{
   const html=fs.readFileSync(path.join(root,'progress-panel.html'),'utf8');
-  assert.match(html,/progress-panel\.js\?v=16/);assert.match(html,/dependencies\.js\?v=7/);
+  assert.match(html,/progress-panel\.js\?v=17/);assert.match(html,/dependencies\.js\?v=8/);
   for(const file of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
-    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=17/,file);
+    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=18/,file);
   }
 });
 
@@ -189,4 +189,15 @@ test('editorial 3S v3 displays the actual next step with no invented remaining e
  assert.equal(p.text('next'),'Probar fichas, búsqueda y exportación en Windows');
  assert.equal(p.text('planned'),'Sin estimar');
  assert.equal(p.text('remaining'),'Sin estimar');
+});
+
+
+test('editorial rough estimate appears only as orientation, with unknown remaining work',async()=>{
+ const desc='*Primer prototipo del catálogo*\n\n**Siguiente paso**\nRevisar navegación\n\n*Estimación · ≈ 11 h (orientativa)*';
+ const p=await panel(card({desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}}));
+ assert.equal(p.text('planned'),'≈ 11 h');
+ assert.match(p.text('plannedCaption'),/orientativa/i);
+ assert.equal(p.text('remaining'),'Sin estimar');
+ assert.match(p.text('remainCaption'),/no calcula trabajo restante/i);
+ assert.equal(p.text('spent'),'Sin estimar');
 });
