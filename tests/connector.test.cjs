@@ -346,7 +346,7 @@ test('editorial multiline dependency remains red on the card and each legacy con
  assert.equal(badges[0]?.color,'red');
  for(const name of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
   const code=fs.readFileSync(path.join(root,name),'utf8');
-  assert.match(code,/progress-panel\.html\?v=22/,name);
+  assert.match(code,/progress-panel\.html\?v=23/,name);
   assert.match(code,/readSection\(source,"Bloqueo"\)/,name);
  }
 });
@@ -375,4 +375,21 @@ test('explicit native effort beats rough editorial estimate, and prior historica
  assert.equal(native[1].text,'⏱ ≈ 5 h prev. · 3 h quedan');
  const historical=await cap['card-badges'](client({card:async()=>({idList:TODO,desc:'*Estimación original · 3–6 h; no medida.*',checklists:[],badges:{checkItems:0,checkItemsChecked:0}})}));
  assert.equal(historical.length,0);
+});
+
+test('uses local list names to resolve dependencies and suppress completed hours',async()=>{
+ const lists=async(...fields)=>{
+  assert.deepEqual(fields,['id','name']);
+  return [{id:'local-todo',name:'📋 POR HACER'},{id:'local-done',name:'✅ HECHO'}];
+ };
+ const card=async()=>({idList:'local-todo',desc:'**Bloqueo** · Depende de [Tarea](https://trello.com/c/CPRnmJFc)',badges:{checkItems:2,checkItemsChecked:1}});
+ const cards=async()=>[{shortLink:'CPRnmJFc',idList:'local-done'}];
+ const cap=setup();
+ const ready=await cap['card-badges'](client({lists,card,cards}));
+ assert.match(ready[0].text,/50%/);
+ const unknown=await cap['card-badges'](client({lists:never,card,cards}));
+ assert.equal(unknown[0].text,'Dependencias sin comprobar');
+ const done=await cap['card-badges'](client({lists,card:async()=>({idList:'local-done',desc:'*Estimación · ≈ 3 h*',badges:{checkItems:2,checkItemsChecked:2}})}));
+ assert.equal(done.length,1);
+ assert.match(done[0].text,/100%/);
 });

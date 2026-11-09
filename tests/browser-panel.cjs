@@ -9,7 +9,7 @@ const evidence=process.env.NB_PANEL_EVIDENCE_DIR||path.join(root,'evidence');
  fs.mkdirSync(evidence,{recursive:true});
  const browser=await chromium.launch({channel:'chrome',headless:true,args:['--no-sandbox']});
  try{
-  const page=await browser.newPage({viewport:{width:620,height:720}});
+  const page=await browser.newPage({viewport:{width:620,height:720},colorScheme:'light'});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.addInitScript(fixture=>window.cardFixture=fixture,partialCard());
   // Exercise the production HTML/JS in a real browser. The Trello boundary is
@@ -24,6 +24,7 @@ const evidence=process.env.NB_PANEL_EVIDENCE_DIR||path.join(root,'evidence');
   });
   await page.goto('http://127.0.0.1/progress-panel.html');
   await page.waitForFunction(()=>document.getElementById('remaining').textContent==='≈ 34,5 h');
+  assert.equal(await page.locator('body').evaluate(body=>getComputedStyle(body).backgroundColor),'rgb(17, 26, 32)');
   async function verify(percent,remaining,completed){
    assert.equal(await page.locator('#percent').textContent(),percent);
    assert.equal(await page.locator('#planned').textContent(),'Sin cerrar');

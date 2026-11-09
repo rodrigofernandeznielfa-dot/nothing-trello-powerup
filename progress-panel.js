@@ -1,7 +1,7 @@
 (function(){
 "use strict";
 const t=window.TrelloPowerUp.iframe();
-const DONE="6aec66f2b6df305a261abb0b",TODO="6aec66ed3137d17f84ce7a3c",DOING="6aec66f02d325131dd44f8d8";
+const workflowLabel={done:"Hecho",todo:"Por hacer",doing:"En curso",ideas:"Ideas",intake:"Entrada"};
 const KEY="nothing_estimates_v1";
 const SNAP="nothing_work_snapshot_v1";
 const RECOMMENDATION="nothing_next_task_decision_v1";
@@ -15,8 +15,8 @@ function readRecommendationDecision(){
   },()=>{window.clearTimeout(timer);resolve({unavailable:true})});
  });
 }
-function renderRecommendation(card,decision,dependencies){
- const box=el("recommendation"),proposal=window.NBDependencies.recommendationFor(card,decision);
+function renderRecommendation(card,decision,dependencies,lists){
+ const box=el("recommendation"),proposal=window.NBDependencies.recommendationFor(card,decision,lists);
  currentRecommendation=proposal?{cardId:card.id,proposal}:null;
  box.hidden=!proposal;
  if(!proposal)return;
@@ -46,8 +46,8 @@ async function decideRecommendation(choice){
  setText("recommendation-status","Guardando tu decisión…");
  try{
   // Check the current proposal before saving a decision made from an older view.
-  const card=await t.card("id","idList","desc");
-  const latest=window.NBDependencies.recommendationFor(card,{});
+  const [card,lists]=await Promise.all([t.card("id","idList","desc","closed"),window.NBDependencies.readBoardLists(t)]);
+  const latest=window.NBDependencies.recommendationFor(card,{},lists);
   if(card.id!==selected.cardId||!latest||latest.source!==selected.proposal.source){
    throw new Error("proposal changed");
   }
@@ -102,13 +102,13 @@ function previewTitle(name){
  const match=String(name||"").match(/NOTHING Studio\s+\d+/i);
  return match?match[0]:String(name||"Tarjeta relacionada");
 }
-function addHoverPreview(link,card){
+function addHoverPreview(link,card,lists){
  const popup=el("dependency-preview");
  if(!popup)return;
  const show=(e)=>{
   popup.replaceChildren();
   const title=document.createElement("div");title.className="preview-title";title.textContent=previewTitle(card.name);
-  const state=document.createElement("div");state.className="preview-state";state.textContent=card.idList===DONE?"Hecho":card.idList===TODO?"Por hacer":card.idList===DOING?"En curso":"Pendiente";
+  const state=document.createElement("div");state.className="preview-state";state.textContent=workflowLabel[window.NBDependencies.workflowState(card.idList,lists)]||"En seguimiento";
   const desc=document.createElement("div");desc.className="preview-desc";desc.textContent=previewSummary(card.desc);
   const hint=document.createElement("div");hint.className="preview-hint";hint.textContent="Clic para abrir la tarjeta";
   popup.append(title,state,desc,hint);popup.hidden=false;
@@ -195,12 +195,13 @@ function explicitNextDecision(desc){
  if(compact)return compact.replace(/^.*?\*\*(?:PRÓXIMO|PROXIMO|SIGUIENTE|SIGUIENTE PASO)\*\*\s*[·:—-]\s*/i,"").trim();
  return null;
 }
-function render(card,estimate,dependencies,cached,decision){
+function render(card,estimate,dependencies,cached,decision,lists){
  const s=extract(card,estimate||{},cached);
- const finished=card.idList===DONE,progress=s.total?Math.round(s.completed*100/s.total):null;
+ const state=window.NBDependencies.workflowState(card.idList,lists);
+ const finished=state==="done",progress=s.total?Math.round(s.completed*100/s.total):null;
  const blocked=!finished&&dependencies&&dependencies.blocked;
  const unknown=!finished&&dependencies&&Boolean(dependencies.unavailable||(dependencies.missing||[]).length);
- setText("state",blocked?"Bloqueada":unknown?"Dependencias sin verificar":finished?"Hecho":card.idList===DOING?"En curso":card.idList===TODO?"Por hacer":"En seguimiento");
+ setText("state",blocked?"Bloqueada":unknown?"Dependencias sin verificar":(workflowLabel[state]||"En seguimiento"));
  el("state").classList.toggle("blocked",!!blocked);
  el("state").classList.toggle("needs-check",!!unknown&&!blocked);
  const blocker=el("blocker");blocker.replaceChildren();
@@ -213,11 +214,11 @@ function render(card,estimate,dependencies,cached,decision){
     link.href=dep.url;link.target="_blank";link.rel="noopener noreferrer";
     link.textContent=dep.name.replace(/^[^A-Za-z0-9]* /,"").split(" — ")[0];
     details.append(link);
-    addHoverPreview(link,dep);
+    addHoverPreview(link,dep,lists);
   });
   blocker.append(heading,details);blocker.hidden=false;
  }else blocker.hidden=true;
- renderRecommendation(card,decision,dependencies);
+ renderRecommendation(card,decision,dependencies,lists);
  renderReferences(card);
  setText("percent",progress===null?"—":progress+"%");
  setText("done",s.total?s.completed+" completados":"Sin criterios");
@@ -272,17 +273,18 @@ const loadingTimeout=window.setTimeout(function(){
 },9000);
 async function load(){
  try{
-  const [card,estimate,cached,decision]=await Promise.all([
-    t.card("id","idList","desc","checklists","badges"),
+  const [card,estimate,cached,decision,lists]=await Promise.all([
+    t.card("id","idList","desc","checklists","badges","closed"),
     t.get("card","shared",KEY,{}).catch(()=>({})),
     t.get("card","shared",SNAP,{}).catch(()=>({})),
-    readRecommendationDecision()
+    readRecommendationDecision(),
+    window.NBDependencies.readBoardLists(t)
   ]);
   let dependencies={blocked:false,dependencies:[],missing:[]};
-  if(card.idList!==DONE && window.NBDependencies.readDependencyIds(card.desc).length){
+  if(window.NBDependencies.workflowState(card.idList,lists)!=="done" && window.NBDependencies.readDependencyIds(card.desc).length){
     try{
       const cards=await t.cards("id","name","shortLink","idList","desc");
-      dependencies=window.NBDependencies.resolve(card.desc,cards,DONE);
+      dependencies=window.NBDependencies.resolve(card.desc,cards,lists);
       dependencies.dependencies.forEach(dep=>{const source=cards.find(c=>c.shortLink===dep.id);if(source){dep.desc=source.desc;dep.idList=source.idList}});
     }catch(error){dependencies.unavailable=true;console.warn("NOTHING dependency lookup failed",error)}
   }
@@ -301,7 +303,7 @@ async function load(){
       t.set("card","shared",SNAP,current).catch(err=>console.warn("NOTHING estimate cache",err));
     }
   }
-  render(card,estimate||{},dependencies,cached,decision);
+  render(card,estimate||{},dependencies,cached,decision,lists);
   loaded=true;window.clearTimeout(loadingTimeout);
  }catch(err){
   loaded=true;window.clearTimeout(loadingTimeout);

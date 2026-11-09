@@ -14,18 +14,18 @@ class Element{
   addEventListener(name,callback){this.events[name]=callback;}
   setAttribute(){}
 }
-async function panel(card,{estimate={},cached={},getFails=false,writeFails=false,decision={},writable=false,recommendationReadFails=false,recommendationReadHangs=false,relatedCards=[],dependencyReadFails=false}={}){
+async function panel(card,{estimate={},cached={},getFails=false,writeFails=false,decision={},writable=false,recommendationReadFails=false,recommendationReadHangs=false,relatedCards=[],boardLists=[],dependencyReadFails=false}={}){
   const elements=new Map();
   for(const id of fs.readFileSync(path.join(root,'progress-panel.html'),'utf8').matchAll(/id="([^"]+)"/g))elements.set(id[1],new Element());
   elements.get('content').hidden=true;
   const writes=[];
-  const client={card:async()=>card,cards:async()=>{if(dependencyReadFails)throw Error("lookup offline");return relatedCards;},render(){},sizeTo:async()=>{},memberCanWriteToModel:()=>writable,
+  const client={card:async()=>card,lists:async()=>boardLists,cards:async()=>{if(dependencyReadFails)throw Error("lookup offline");return relatedCards;},render(){},sizeTo:async()=>{},memberCanWriteToModel:()=>writable,
     get:async(model,visibility,key)=>{if(recommendationReadHangs&&key==='nothing_next_task_decision_v1')return new Promise(()=>{});if(getFails||(recommendationReadFails&&key==='nothing_next_task_decision_v1'))throw Error('unavailable');return key==='nothing_estimates_v1'?estimate:key==='nothing_next_task_decision_v1'?decision:cached},
     set:async(model,visibility,key,value)=>{if(writeFails)throw Error('readonly');writes.push({key,value});if(key==='nothing_next_task_decision_v1')decision=value}};
   const document={body:new Element(),getElementById:id=>{assert.ok(elements.has(id),'Missing element '+id);return elements.get(id)},createElement:()=>new Element(),createTextNode:text=>({textContent:text})};
   const timers=new Set();
   const window={TrelloPowerUp:{iframe:()=>client},setTimeout:(fn,ms)=>{const id=setTimeout(fn,ms);timers.add(id);return id},clearTimeout:id=>{clearTimeout(id);timers.delete(id)}};
-  const context=vm.createContext({window,document,console:{warn(){},error(){}}});
+  const context=vm.createContext({window,document,setTimeout:window.setTimeout,clearTimeout:window.clearTimeout,console:{warn(){},error(){}}});
   vm.runInContext(fs.readFileSync(path.join(root,'dependencies.js'),'utf8'),context);
   vm.runInContext(fs.readFileSync(path.join(root,'progress-panel.js'),'utf8'),context);
   try{
@@ -96,9 +96,9 @@ test('zero remaining/completed estimates are valid and readonly cache errors do 
 });
 test('every supported connector reloads the corrected card panel',()=>{
   const html=fs.readFileSync(path.join(root,'progress-panel.html'),'utf8');
-  assert.match(html,/progress-panel\.js\?v=18/);assert.match(html,/dependencies\.js\?v=8/);
+  assert.match(html,/progress-panel\.js\?v=19/);assert.match(html,/dependencies\.js\?v=9/);
   for(const file of ['connector.html','index.html',...Array.from({length:16},(_,i)=>'connector-v'+(i+2)+'.html')]){
-    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=22/,file);
+    assert.match(fs.readFileSync(path.join(root,file),'utf8'),/progress-panel\.html\?v=23/,file);
   }
 });
 
@@ -245,4 +245,19 @@ test('fully checked predecessor removes uncertain state, but unfinished predeces
  const ok=await panel(c,{relatedCards:[{shortLink:'CPRnmJFc',name:'Studio 01',idList:'6aec66f2b6df305a261abb0b'}]});
  assert.equal(ok.text('state'),'Por hacer');
  assert.equal(ok.text('next'),'Probar una importación');
+});
+
+test('shows the current board workflow and rechecks eligibility when saving a proposal',async()=>{
+ const boardLists=[{id:'local-todo',name:'📋 POR HACER'},{id:'local-doing',name:'🛠️ EN CURSO'},{id:'local-done',name:'✅ HECHO'}];
+ const fixture={...proposalCard(),idList:'local-todo'};
+ const p=await panel(fixture,{boardLists,writable:true});
+ assert.equal(p.text('state'),'Por hacer');
+ assert.equal(p.node('recommendation').hidden,false);
+ fixture.idList='local-doing';
+ await p.click('recommendation-accept');
+ assert.match(p.text('recommendation-status'),/ha cambiado/);
+ assert.equal(p.writes.length,0);
+ const done=await panel(card({idList:'local-done'}),{boardLists});
+ assert.equal(done.text('state'),'Hecho');
+ assert.equal(done.text('remaining'),'0 h');
 });
