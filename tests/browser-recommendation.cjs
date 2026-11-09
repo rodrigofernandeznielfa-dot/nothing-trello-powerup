@@ -37,6 +37,13 @@ const evidence=process.env.NB_PANEL_EVIDENCE_DIR||path.join(root,'evidence');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Recommendation overflows narrow viewport');
    await page.screenshot({path:path.join(evidence,'recommendation-pending-'+width+'.png'),fullPage:true});
   }
+  // The owner requires a true yellow accent, not orange, and readable action buttons.
+  const palette=await page.evaluate(()=>({
+   accent:getComputedStyle(document.querySelector('#recommendation')).borderLeftColor,
+   accept:getComputedStyle(document.getElementById('recommendation-accept')).backgroundColor
+  }));
+  assert.equal(palette.accent,'rgb(250, 204, 21)');
+  assert.equal(palette.accept,'rgb(250, 204, 21)');
   assert.equal(await page.evaluate(()=>window.decisionWrites.length),0,'Loading a suggestion must not accept it');
   await page.locator('#recommendation-accept').focus();await page.keyboard.press('Enter');
   await page.waitForFunction(()=>document.getElementById('recommendation-title').textContent==='Próxima tarea acordada');
