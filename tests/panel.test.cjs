@@ -183,11 +183,12 @@ test('compact cards keep their native next step instead of a generic fallback',a
 });
 
 
-test('editorial 3S v3 displays the actual next step with no invented remaining effort',async()=>{
+test('editorial 3S v3 retains the actual next step and labels rough hours honestly',async()=>{
  const desc='*Estudio sencillo y visual*\n\n**Situación actual**\nPrototipo pendiente de validar\n\n**Siguiente paso**\nProbar fichas, búsqueda y exportación en Windows\n\n*Estimación previa · ≈11 h orientativas*\n\n---\n\n*Referencias · [Archivo](https://github.com/example/test/issues/1)*';
  const p=await panel(card({desc,checklists:[],badges:{checkItems:0,checkItemsChecked:0}}));
  assert.equal(p.text('next'),'Probar fichas, búsqueda y exportación en Windows');
- assert.equal(p.text('planned'),'Sin estimar');
+ assert.equal(p.text('planned'),'≈ 11 h');
+ assert.match(p.text('plannedCaption'),/orientativa/i);
  assert.equal(p.text('remaining'),'Sin estimar');
 });
 
