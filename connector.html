@@ -235,8 +235,7 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
       var actualPercent=Math.round(100*actualDone/actualTotal);
       var steps=Math.round(actualPercent/20);
       return withSignals([{
-        text:"▰".repeat(steps)+"░".repeat(5-steps)+" "+actualPercent+"%",
-        color:actualPercent===100?"green":"light-gray"
+        text:"▰".repeat(steps)+"░".repeat(5-steps)+" "+actualPercent+"%"
       }]);
     }
     var percent=Math.round(done*100/total),filled=Math.round(percent/20);
@@ -250,7 +249,7 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
        :"⏱ ≈ "+fmtHour(effective.planned)+" h prev. · "+fmtHour(effective.remaining)+" h quedan")
        :hours===null?"⏱ Sin estimar":"⏱ "+Math.round(hours*10)/10+" h pendientes");
     var badges=[
-      {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")",color:percent===100?"green":"blue"}
+      {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")"}
     ];
     if(timeText)badges.push({text:timeText,color:"light-gray"});
     return withSignals(badges);
