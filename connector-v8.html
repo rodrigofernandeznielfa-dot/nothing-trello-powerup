@@ -158,7 +158,7 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
   }
   async function getBadges(t){
     var data=await Promise.all([
-      within(t.card("idList","checklists","badges","desc"),1500),
+      within(t.card("idList","name","checklists","badges","desc"),1500),
       within(t.get("card","shared",KEY,{}),900).catch(function(){return {}}),
       within(t.get("card","shared",SNAP,{}),900).catch(function(){return {}}),
       within(t.get("card","shared",RECOMMENDATION,{}),900).catch(function(){return {unavailable:true}})
@@ -215,6 +215,29 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
     var pending=items.filter(function(x){return x.state!=="complete"});
     var known=!usingNative && pending.every(function(x){return typeof estimates[x.id]==="number" && Number.isFinite(estimates[x.id]) && estimates[x.id]>=0});
     var hours=known?pending.reduce(function(sum,x){return sum+estimates[x.id]},0):null;
+    // COMPLEX: compact progress on card fronts; no redundant times or counts.
+    // Existing boards keep their original badges and suggestions unchanged.
+    var complexLists=[
+      "6af522833ea8b2f386d085d5", // HARDWARE
+      "6af522851b37f9ddc247592a", // SOFTWARE
+      "6af5228874fe12ca37577125", // DEVELOPMENT
+      "6af5228b1c7b3de6da316741"  // ARCHIVE
+    ];
+    if(complexLists.includes(card.idList)){
+      if(card.idList===complexLists[3]||/(?:BLOQ|PROP)-\d+/i.test(String(card.name||"")))return withSignals([]);
+      var milestone=(card.checklists||[]).find(function(list){
+        return /^AVANCE\s*·\s*HITOS VERIFICABLES/i.test(list.name||"")
+          && Array.isArray(list.checkItems)&&list.checkItems.length>0;
+      });
+      var actualDone=milestone?milestone.checkItems.filter(function(item){return item.state==="complete"}).length:done;
+      var actualTotal=milestone?milestone.checkItems.length:total;
+      if(!actualTotal)return withSignals([]);
+      var actualPercent=Math.round(100*actualDone/actualTotal);
+      var steps=Math.round(actualPercent/20);
+      return withSignals([{
+        text:"▰".repeat(steps)+"░".repeat(5-steps)+" "+actualPercent+"%"
+      }]);
+    }
     var percent=Math.round(done*100/total),filled=Math.round(percent/20);
     // Completed cards show only their retrospective work estimate.
     // No redundant "0 h pendientes" or "sin medir" on the board.
@@ -226,7 +249,7 @@ root.NBDependencies={readSection,readDependencyIds,resolve,readHistoricHours,rea
        :"⏱ ≈ "+fmtHour(effective.planned)+" h prev. · "+fmtHour(effective.remaining)+" h quedan")
        :hours===null?"⏱ Sin estimar":"⏱ "+Math.round(hours*10)/10+" h pendientes");
     var badges=[
-      {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")",color:percent===100?"green":"blue"}
+      {text:"▰".repeat(filled)+"▱".repeat(5-filled)+" "+percent+"% ("+done+"/"+total+")"}
     ];
     if(timeText)badges.push({text:timeText,color:"light-gray"});
     return withSignals(badges);
